@@ -47,9 +47,12 @@ def vod_rows(db):
     + extraits sur ce PC) / analysée (n extraits)."""
     by_url = {s["url"]: s["id"] for s in db["sources"].values()}
     count = {}
+    found = set()  # sources avec au moins un extrait trouvé par une analyse (pas seulement des passages ajoutés à la main)
     for c in db["clips"].values():
         d = count.setdefault(c["source_id"], {"new": 0, "kept": 0, "trash": 0})
         d[c["status"]] = d.get(c["status"], 0) + 1
+        if not str(c.get("why") or "").startswith("ajouté"):
+            found.add(c["source_id"])
     busy = {j.label: j.status for j in jobs.JOBS.values() if j.kind == "collect" and j.status in ("en attente", "en cours")}
     run, pend = engines.running(), set(db.get("pending", []))
     scan_t = time.mktime(time.strptime(db["vods_scan"], "%Y-%m-%d %H:%M:%S")) if db.get("vods_scan") else time.time()
@@ -61,7 +64,8 @@ def vod_rows(db):
         sid = by_url.get(v["url"])
         src = db["sources"].get(sid) or {}
         n = count.get(sid, {"new": 0, "kept": 0, "trash": 0})
-        done = any(a.get("clips") for a in src.get("analyses", [])) or sum(n.values()) > 0  # 0 extrait = pas analysée
+        # 0 extrait = pas analysée ; un passage ajouté à la main ne compte pas, sinon la VOD ne serait jamais analysée
+        done = any(a.get("clips") for a in src.get("analyses", [])) or sid in found
         if v["url"] in run:
             v["state"] = "en cours"
             v.update(run[v["url"]])  # machine, step

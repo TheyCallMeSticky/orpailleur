@@ -245,13 +245,18 @@ def export(job):
         if len(pieces) == 1:
             cmd = ["ffmpeg", "-v", "error", "-y", "-ss", f"{c['in']:.3f}", "-i", src, *silence, "-t", f"{d:.3f}", "-map", "0:v:0",
                    "-map", "0:a:0" if has_audio else "1:a:0", "-vf", vf, "-af", af]
-        else:  # extrait coupé : ses morceaux recollés en un seul segment, puis la même mise en forme
-            fc = "".join(f"[0:v]trim=start={a:.3f}:end={b:.3f},setpts=PTS-STARTPTS[v{k}];" for k, (a, b) in enumerate(pieces))
+        else:  # extrait coupé : ses morceaux reliés par un léger fondu (image + son), puis la même mise en forme
+            fc = "".join(f"[0:v]trim=start={a:.3f}:end={b:.3f},setpts=PTS-STARTPTS,fps={fps},settb=AVTB[v{k}];"
+                         for k, (a, b) in enumerate(pieces))
             if has_audio:
                 fc += "".join(f"[0:a]atrim=start={a:.3f}:end={b:.3f},asetpts=PTS-STARTPTS[a{k}];" for k, (a, b) in enumerate(pieces))
-            fc += "".join(f"[v{k}]" + (f"[a{k}]" if has_audio else "") for k in range(len(pieces)))
-            fc += f"concat=n={len(pieces)}:v=1:a={int(has_audio)}[vc]" + ("[ac]" if has_audio else "")
-            fc += f";[vc]{vf}[vo];[{'ac' if has_audio else '1:a'}]{af}[ao]"
+            v, a_, L = "[v0]", "[a0]", pieces[0][1] - pieces[0][0]
+            for k, x in enumerate(store.joins(pieces), 1):  # fondu k entre les morceaux k-1 et k : ils se chevauchent de x s
+                fc += f"{v}[v{k}]xfade=transition=fade:duration={x:.3f}:offset={L - x:.3f}[x{k}];"
+                if has_audio:
+                    fc += f"{a_}[a{k}]acrossfade=d={x:.3f}[y{k}];"
+                v, a_, L = f"[x{k}]", f"[y{k}]", L + pieces[k][1] - pieces[k][0] - x
+            fc += f"{v}{vf}[vo];[{a_.strip('[]') if has_audio else '1:a'}]{af}[ao]"
             cmd = ["ffmpeg", "-v", "error", "-y", "-i", src, *silence, "-filter_complex", fc, "-map", "[vo]", "-map", "[ao]",
                    "-t", f"{d:.3f}"]
         cmd += ["-c:v", "libx264", "-preset", "fast", "-crf", str(conf.get("crf", 18)), "-g", str(fps * 2),

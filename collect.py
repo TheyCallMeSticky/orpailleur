@@ -606,6 +606,9 @@ def import_clip(job, url, m, streamer, window="", local=None):
             f = download(url, cid, lo, hi) if window else download(url, cid)
     by = CTX.get("added_by")
     add_clip(src, f, s0, lo - s0, hi - s0 if window else None, f"ajouté par {by}" if by else "ajouté à la main", 50)
+    if by:  # source déjà connue (VOD analysée) : la vidéo reste visible dans « Vidéos » comme ajoutée à la main
+        with store.tx() as db:
+            db["sources"][src["id"]].setdefault("added_by", by)
     return 1
 
 

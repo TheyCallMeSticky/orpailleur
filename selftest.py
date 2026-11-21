@@ -171,9 +171,9 @@ with store.tx() as db:
     db["sources"]["sc"] = {"id": "sc", "url": "u-cut", "streamer": "Geo", "streamer_url": "https://www.twitch.tv/geo"}
     db["clips"]["cut"] = {"id": "cut", "source_id": "sc", "status": "new", "in": 2.0, "out": 20.0, "file_dur": 30.0, "added": store.now()}
 c = app.patch_clip("cut", {"segs": [[20, 40], [5, 10], [8, 12], [-3, 1], [15, 15.2]]}, "u")
-assert c["segs"] == [[0, 1], [5, 12], [20, 30]] and (c["in"], c["out"]) == (0, 30) and store.cdur(c) == 18, c
+assert c["segs"] == [[0, 1], [5, 12], [20, 30]] and (c["in"], c["out"]) == (0, 30) and store.cdur(c) == 18 - 2 * store.XF, c
 c = app.patch_clip("cut", {"in": 6, "out": 25}, "u")  # ancien réglage début/fin : rogne les morceaux
-assert c["segs"] == [[6, 12], [20, 25]] and store.cdur(c) == 11, c
+assert c["segs"] == [[6, 12], [20, 25]] and store.cdur(c) == 11 - store.XF, c  # fondu entre les 2 morceaux
 c = app.patch_clip("cut", {"segs": [[0, 5], [5, 8]]}, "u")
 assert "segs" not in c and (c["in"], c["out"]) == (0, 8) and store.cdur(c) == 8, c
 for bad in ([], [[3, 3.1]], [["a", 2]], "x"):
@@ -201,7 +201,7 @@ with store.tx() as db:
 row = app.vod_rows(store.load())[0]
 assert abs(row["ended"] - (time.time() - 7200)) < 5 and row["day"] == store.day(row["ended"]), row
 
-# export d'un extrait coupé en 2 morceaux (avec son, puis sans son) : un seul segment de la durée totale des morceaux
+# export d'un extrait coupé en 2 morceaux (avec son, puis sans son) : un seul segment = morceaux - fondu de 0,25 s entre eux
 av = store.TMP / "av.mp4"
 subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=30", "-f", "lavfi", "-i",
                 "sine=frequency=440:sample_rate=48000", "-t", "30", "-shortest", "-c:a", "aac", str(av)], check=True)
@@ -216,8 +216,8 @@ app.patch_clip("av", {"segs": [[2, 5], [10, 14]]}, "u")
 app.patch_clip("mute", {"segs": [[1, 3], [20, 23.5]]}, "u")
 rec = montage.export(jobs.Job("export", "test", None, ()))
 seg = sorted((store.DATA / rec["dir"] / "segments").glob("*.mp4"))
-assert [abs(collect.probe(f)["dur"] - d) < .2 for f, d in zip(seg, (7, 5.5))] == [True, True], [collect.probe(f) for f in seg]
-assert all(collect.probe(f)["audio"] for f in seg) and abs(rec["dur"] - 12.5) < .3, rec
+assert [abs(collect.probe(f)["dur"] - d) < .2 for f, d in zip(seg, (6.75, 5.25))] == [True, True], [collect.probe(f) for f in seg]
+assert all(collect.probe(f)["audio"] for f in seg) and abs(rec["dur"] - 12.0) < .3, rec
 
 # ajout à la main « tel quel dans le Tri » (fichier local) : un passage = un extrait en tête du Tri ; > 30 min refusé
 long = store.TMP / "long.mp4"

@@ -108,7 +108,9 @@ kbd{border:1px solid var(--line2);border-bottom-width:2px;border-radius:5px;padd
 .item .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .item .acts button{padding:5px 11px}
 .item .acts:empty{display:none}
-.item [data-add]{width:36px;height:36px;padding:0;border-radius:50%;font-size:18px;font-weight:700;color:var(--ink);background:var(--mint);border-color:var(--mint)}
+.item [data-add],.item [data-bin]{width:36px;height:36px;padding:0;border-radius:50%;display:inline-flex;align-items:center;justify-content:center}
+.item [data-add]{color:var(--ink);background:var(--mint);border-color:var(--mint)}
+.item [data-bin][data-armed]{width:auto;padding:0 12px;border-radius:18px;color:var(--err);border-color:var(--err)}
 .item [data-add]:hover{filter:brightness(1.1)}
 .item [data-rm]:hover{border-color:var(--err);color:var(--err)}
 .item.drag{opacity:.4}
@@ -578,7 +580,9 @@ const MIN_PIECE = .5;
 const r2 = x => Math.round(x * 100) / 100;
 const segsOf = c => c.segs && c.segs.length ? c.segs : [[c.in, c.out]];
 const segsDur = sg => sg.reduce((a, [x, y]) => a + Math.max(0, y - x), 0);
-const dur = c => segsDur(segsOf(c));
+const XF = .25;  // fondu entre deux morceaux à l'export (comme store.joins) : les morceaux se chevauchent d'autant
+const joinsDur = sg => sg.slice(1).reduce((s, [a, b], k) => s + Math.min(XF, (b - a) / 2, (sg[k][1] - sg[k][0]) / 2), 0);
+const dur = c => { const sg = segsOf(c); return segsDur(sg) - joinsDur(sg); };
 const segAt = (sg, t) => sg.findIndex(([a, b]) => t >= a - .05 && t < b);  // morceau sous t, -1 dans un trou
 const nextSeg = (sg, t) => sg.findIndex(([a]) => a > t);
 const segsElapsed = (sg, t) => sg.reduce((s, [a, b]) => s + Math.min(b - a, Math.max(0, t - a)), 0);  // temps utile déjà joué
@@ -686,7 +690,7 @@ function makeEditor(root, loop, tools = root){
     const p = sg[sel];
     q(".einv").textContent = p ? fmt1(p[0]) : ""; q(".eoutv").textContent = p ? fmt1(p[1]) : "";
     q(".epiece").textContent = sg.length > 1 ? `Morceau ${sel + 1}/${sg.length} ·` : "";
-    q(".edur").textContent = c ? fmt1(segsDur(sg)) : "";
+    q(".edur").textContent = c ? fmt1(segsDur(sg) - joinsDur(sg)) : "";  // durée dans la vidéo finale (fondus compris)
     q("[data-a=del]").hidden = sg.length < 2;
     drawPos();
   }
@@ -809,12 +813,16 @@ async function addVideo(mode){  // mode : "whole" | "auto" | undefined (le serve
   if (!f && !input) return toast("Colle un lien ou choisis un fichier");
   if (from && !to) return toast("Indique aussi la fin du passage (ex. 1:35:00)");
   if ((from && !TIME_RE.test(from)) || (to && !TIME_RE.test(to))) return toast("Écris les temps comme 1:20:00 ou 5:30");
+  const sec = t => t.split(":").reduce((a, x) => a * 60 + +x, 0);
+  if (to && sec(to) <= sec(from || "0")) return toast("La fin du passage doit être après le début");
   const win = to ? (from || "0:00") + "-" + to : "";
   if (f) {
     toast("Envoi de " + f.name + "…");
     const q = new URLSearchParams({name:f.name, max:S.settings.max_moments, window:win, streamer});
     if (mode) q.set("mode", mode);
-    const r = await fetch("/api/upload?" + q, {method:"POST", body:f, headers:{"X-User":encodeURIComponent(me)}});
+    let r;
+    try { r = await fetch("/api/upload?" + q, {method:"POST", body:f, headers:{"X-User":encodeURIComponent(me)}}); }
+    catch (e) { return toast("Échec de l'envoi : vérifie le passage et ta connexion"); }  // refus du serveur avant la fin de l'envoi
     if (!r.ok) { let m = "Échec de l'envoi"; try { m = (await r.json()).error || m; } catch(e){} return toast(m); }
     $("#aFile").value = "";
   } else {
@@ -881,7 +889,7 @@ function handRows(vodUrls){  // vidéos ajoutées à la main : en cours (tâche)
   const out = [], n = {};
   for (const c of S.clips) { const x = n[c.source_id] = n[c.source_id] || {new:0, kept:0, trash:0, thumb:""}; x[c.status]++; x.thumb = x.thumb || c.thumb; }
   for (const j of S.jobs) {
-    if (j.kind !== "collect" || j.status === "terminé" || vodUrls.has(j.label)) continue;
+    if (j.kind !== "collect" || j.status === "terminé" || (j.status !== "erreur" && vodUrls.has(j.label))) continue;  // un échec se voit toujours
     const step = (j.lines.slice().reverse().find(l => l.includes("▶ ")) || "").split("▶ ")[1];
     const err = (j.lines.find(l => /ERREUR :/.test(l)) || "").split("ERREUR :")[1] || "";
     out.push({who:"Vidéo ajoutée", title:j.label, url:/^https?:\/\//.test(j.label) ? j.label : "", meta:ago(hoursSince(j.created)),
@@ -890,10 +898,14 @@ function handRows(vodUrls){  // vidéos ajoutées à la main : en cours (tâche)
       state: j.status === "erreur" ? `<span class="err" title="${esc(err)}">échec : ${esc(shortErr(err))}</span>`
         : j.status === "en attente" ? `<span class="warn">en file</span>` : `<span class="run">en cours${stepWord(step) ? " · " + stepWord(step) : ""}</span>`});
   }
-  for (const s of S.sources) {
-    const k = n[s.id]; if (!s.added_by || !k || vodUrls.has(s.url)) continue;
-    out.push({who:s.streamer || "?", title:s.title, url:s.url, thumb:k.thumb ? "/files/" + k.thumb : "", day:dayOf(s.added),
-      t:+dateOf(s.added), todo:false, rank:9, meta:"ajoutée par " + esc(s.added_by) + " · " + ago(hoursSince(s.added)), ...doneState(k, s.id)});
+  for (const s of S.sources) {  // analysée, mais sortie de la liste des 24 h (ou ajoutée à la main) : reste visible, au jour de l'analyse
+    const k = n[s.id]; if (!k || vodUrls.has(s.url)) continue;
+    const when = ((s.analyses || []).slice(-1)[0] || {}).date || s.added;
+    if (hoursSince(when) > 24 * 7) continue;  // shortcut: 7 jours affichés, ajouter une page « archives » si on en veut plus
+    out.push({who:s.streamer || "?", title:s.title, url:/^https?:\/\//.test(s.url) ? s.url : "", thumb:k.thumb ? "/files/" + k.thumb : "", day:dayOf(when),
+      t:+dateOf(when), todo:false, rank:9, ...doneState(k, s.id),
+      meta: s.added_by ? "ajoutée par " + esc(s.added_by) + " · " + ago(hoursSince(s.added))
+        : [esc(s.platform), s.duration ? fmt(s.duration) : "", "analysée " + ago(hoursSince(when))].filter(Boolean).join(" · ")});
   }
   return out;
 }
@@ -906,9 +918,9 @@ const rowHTML = r => `<div class="item vrow">
     <div class="state">${r.state}</div>
     <div class="acts">${r.acts}</div></div>`;
 function renderVods(){
-  const gta = $("#vGta").checked, vodUrls = new Set(S.vods.map(v => v.url));
+  const gta = $("#vGta").checked;
   const vs = S.vods.filter(v => !gta || v.gta), hidden = S.vods.length - vs.length;
-  const all = [...vs.map(vodRow), ...handRows(vodUrls)];
+  const all = [...vs.map(vodRow), ...handRows(new Set(vs.map(v => v.url)))];  // une VOD masquée (hors GTA) ajoutée à la main reste visible
   const rows = all.filter(r => vFilt === "all" || (vFilt === "todo") === r.todo);
   const scanning = S.jobs.some(j => j.kind === "scan" && /attente|cours/.test(j.status));
   $("#vUpd").textContent = scanning ? "Recherche en cours…" : S.vods_scan ? "mise à jour " + ago(hoursSince(S.vods_scan)) : "";
@@ -1014,24 +1026,33 @@ function renderMachines(){
   $$("[data-msg]").forEach(b => b.onclick = async () => showMsg(await api("/api/machines/message", {name:b.dataset.msg})));
 }
 function showMsg(r){  // le message complet pour l'ami, prêt à copier-coller
+  const hub = r.sort.split("/?")[0];  // adresse du site (Tailscale), sans la clé de tri
   const msg = `Salut ! Voilà comment faire tourner le moteur d'analyse sur ton PC (une seule fois, environ 15 min) :
 
-1) Installe Tailscale : https://tailscale.com/download et connecte-toi (avec ton compte Google, c'est le plus simple).
-   ${r.invite ? "Ensuite ouvre ce lien et accepte l'invitation : " + r.invite : "Ensuite accepte l'invitation Tailscale que je t'envoie à part."}
+1) Installe Tailscale : https://tailscale.com/download
+   Ouvre-le et connecte-toi (avec ton compte Google, c'est le plus simple).
 
-2) Installe le moteur :
+2) Accepte mon invitation, avec le même compte que dans Tailscale :
+   ${r.invite || "(je t'envoie le lien à part)"}
+
+3) Vérifie que ça marche : ouvre ${hub} dans ton navigateur.
+   Tu dois voir une page « Accès privé ».
+   Si la page ne s'ouvre pas : clique sur l'icône Tailscale à côté de l'horloge (parfois cachée sous la petite flèche ^),
+   choisis le réseau de l'invitation (pas le tien), il doit dire « Connected ». Puis réessaie.
+
+4) Installe le moteur :
    - Windows : appuie sur la touche Windows, tape PowerShell, Entrée, colle cette ligne puis Entrée :
      ${r.win}
    - Mac : Cmd + Espace, tape Terminal, Entrée, colle cette ligne puis Entrée :
      ${r.mac}
    La première fois il télécharge environ 3 Go : laisse faire jusqu'à voir « Connecté à … ».
 
-3) Ensuite, pour le relancer : double-clic sur « Moteur Best-of » sur ton Bureau. Laisse la fenêtre ouverte (tu peux la réduire),
+5) Les fois suivantes : double-clic sur « Moteur Best-of » sur ton Bureau. Laisse la fenêtre ouverte (tu peux la réduire),
    ferme-la pour l'arrêter. Il se met à jour tout seul. Évite juste que ton PC se mette en veille pendant que ça tourne.
 
-4) Pour trier les extraits avec moi : ${r.sort}`;
+6) Pour trier les extraits avec moi : ${r.sort}`;
   $("#maOut").innerHTML = `<div class="why" style="margin-top:10px"><b>Message pour « ${esc(r.name)} »</b>
-    <textarea id="maMsg" readonly rows="20" style="width:100%;margin-top:6px;font-size:13px"></textarea>
+    <textarea id="maMsg" readonly rows="26" style="width:100%;margin-top:6px;font-size:13px"></textarea>
     <div class="row" style="margin-top:6px"><button class="primary" id="maCopy">Copier le message</button>
       <span class="small muted">Envoie-le en privé.</span></div></div>`;
   $("#maMsg").value = msg;
@@ -1115,7 +1136,7 @@ function showClip(c, remaining){
   $("#tmeta").className = "";
   $("#tmeta").innerHTML = `<h2 style="margin:0">${esc(s.streamer || "?")}</h2>
     <div class="small muted">${esc(s.title || "")}</div>
-    <div class="small" style="margin-top:6px">à ${fmt(c.src_start + segsOf(c)[0][0])} dans la VOD${s.url ? ` · <a href="${esc(s.url)}" target="_blank" rel="noopener">voir la vidéo d'origine</a>` : ""}</div>
+    <div class="small" style="margin-top:6px">à ${fmt(c.src_start + segsOf(c)[0][0])} dans la VOD${/^https?:\/\//.test(s.url || "") ? ` · <a href="${esc(s.url)}" target="_blank" rel="noopener">voir la vidéo d'origine</a>` : ""}</div>
     ${by ? `<div class="why">${esc(by)}</div>` : ""}
     ${c.ai && c.ai.category ? `<div class="why suggest">Claude propose
       <span class="cat ${esc(c.ai.category)}">${esc(c.ai.category)}</span> <span class="stars">${stars(c.ai.rating)}</span>
@@ -1190,7 +1211,7 @@ function itemHTML(c, i, inProj){
     <div class="acts">${inProj
       ? `<button data-up="${esc(c.id)}" title="Monter">↑</button><button data-down="${esc(c.id)}" title="Descendre">↓</button><button data-rm="${esc(c.id)}" title="Retirer">✕</button>`
       : c.status === "trash" ? `<button data-restore="${esc(c.id)}">Remettre à trier</button>`
-      : `<button data-add="${esc(c.id)}" title="Ajouter au best-of">＋</button>`}</div></div>`;
+      : `<button data-bin="${esc(c.id)}" title="Mettre à la poubelle">${ICON_BIN}</button><button data-add="${esc(c.id)}" title="Ajouter au best-of">${ICON_PLUS}</button>`}</div></div>`;
 }
 function renderBestof(){
   const pj = S.project, items = projItems();
@@ -1230,11 +1251,19 @@ function renderBestof(){
   if (run) $("#exps").insertAdjacentHTML("afterbegin", `<pre class="muted small">${esc(run.lines.join("\n"))}</pre>`);
   wireLists();
 }
+// icônes dessinées (le « ＋ » pleine chasse n'était pas centré dans son rond)
+const ICON_PLUS = `<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v11M2.5 8h11" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>`;
+const ICON_BIN = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4M6.5 6.5v5M9.5 6.5v5"/></svg>`;
 function wireLists(){
   const ids = () => S.project.items.slice();
   $$("[data-add]").forEach(b => b.onclick = () => saveProject({items:[...ids(), b.dataset.add]}));
   $$("[data-rm]").forEach(b => b.onclick = () => saveProject({items:ids().filter(i => i !== b.dataset.rm)}));
   $$("[data-restore]").forEach(b => b.onclick = async () => { await api("/api/clip/"+b.dataset.restore, {status:"new"}); refresh(); });
+  $$("[data-bin]").forEach(b => b.onclick = () => {  // 1er clic : « Poubelle ? », 2e clic : poubelle (récupérable jusqu'au prochain export)
+    if (!b.dataset.armed) { b.dataset.armed = 1; b.textContent = "Poubelle ?";
+      return setTimeout(() => { if (b.isConnected && b.dataset.armed) { delete b.dataset.armed; b.innerHTML = ICON_BIN; } }, 4000); }
+    api("/api/clip/" + b.dataset.bin, {status:"trash"}).then(() => { toast("À la poubelle (filtre « Poubelle » pour le récupérer avant le prochain export)"); refresh(); });
+  });
   $$("[data-up],[data-down]").forEach(b => b.onclick = () => {
     const a = ids(), id = b.dataset.up || b.dataset.down, i = a.indexOf(id), j = i + (b.dataset.up ? -1 : 1);
     if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; saveProject({items:a}); });
@@ -1271,6 +1300,7 @@ $("#sFps").onchange = $("#sLower").onchange = async () => {
 let mc = null;
 const mEd = makeEditor($("#mEd"), false);
 $("#mCat").innerHTML += CATS.map(c => `<option>${c}</option>`).join("");
+$("#mCat").onchange = e => e.target.blur();  // sinon ← → changent la catégorie au lieu d'avancer la vidéo
 function openTrim(id){
   const c = S.clips.find(x => x.id === id); if (!c) return;
   mc = {...c};
@@ -1284,7 +1314,9 @@ function drawStars(){
 }
 $("#mClose").onclick = () => { mEd.clear(); $("#mTrim").hidden = true; mc = null; };
 $("#mSave").onclick = async () => {
-  await api("/api/clip/" + mc.id, {segs:mEd.segs, category:$("#mCat").value || undefined, rating:mc.rating || undefined});
+  const id = mc.id;
+  await api("/api/clip/" + id, {segs:mEd.segs, category:$("#mCat").value || undefined, rating:mc.rating || undefined});
+  if (cur && cur.id === id) cur = null;  // ouvert aussi dans le Tri : on le recharge, sinon le Tri renverrait l'ancienne découpe
   $("#mClose").click(); toast("Extrait mis à jour"); refresh(); };
 
 /* ---------------- aperçu du best-of : les morceaux de chaque extrait à la suite ---------------- */

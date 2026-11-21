@@ -91,9 +91,18 @@ def segs(c):
     return c.get("segs") or [[c["in"], c["out"]]]
 
 
+XF = 0.25  # fondu image + son entre deux morceaux d'un extrait coupé (les deux morceaux se chevauchent d'autant)
+
+
+def joins(p):
+    """Durée de chaque fondu entre morceaux : 0,25 s, moins si un morceau est très court (au plus la moitié de chacun)."""
+    return [min(XF, (p[k][1] - p[k][0]) / 2, (p[k + 1][1] - p[k + 1][0]) / 2) for k in range(len(p) - 1)]
+
+
 def cdur(c):
-    """Durée utile d'un extrait : la somme de ses morceaux (après réglage et coupes)."""
-    return sum(max(0.0, float(b) - float(a)) for a, b in segs(c))
+    """Durée utile d'un extrait : ses morceaux (après réglage et coupes), moins les fondus qui les relient."""
+    p = segs(c)
+    return sum(max(0.0, float(b) - float(a)) for a, b in p) - sum(joins(p))
 
 
 def day(t):
