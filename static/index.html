@@ -1,0 +1,964 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Best-of GTA 6</title>
+<style>
+:root{
+  --bg:#0e0f13;--panel:#171920;--panel2:#1f222b;--line:#2b2f3a;--text:#e9eaee;--muted:#9097a6;--accent:#ff4fa3;
+  --WTF:#a970ff;--FUN:#ffd23f;--FAIL:#ff5252;--EPIC:#29d3f5;--ok:#3ddc84;--warn:#ffb020;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:7px 12px}
+button:hover{border-color:#4a5060}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button.ghost{background:transparent}
+button:disabled{opacity:.45;cursor:default}
+input,select,textarea{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
+a{color:#7cc4ff}
+header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:6px;padding:10px 16px;background:#0e0f13ee;
+  backdrop-filter:blur(6px);border-bottom:1px solid var(--line);flex-wrap:wrap}
+header h1{font-size:16px;margin:0 14px 0 0;letter-spacing:.3px}
+header h1 b{color:var(--accent)}
+nav{display:flex;gap:4px;flex-wrap:wrap}
+nav button{background:transparent;border-color:transparent}
+nav button.on{background:var(--panel2);border-color:var(--line)}
+.badge{display:inline-block;min-width:20px;padding:0 6px;border-radius:10px;background:var(--accent);color:#fff;font-size:12px;text-align:center;margin-left:4px}
+.me{margin-left:auto;color:var(--muted)}
+main{padding:16px;max-width:1500px;margin:0 auto}
+.view[hidden]{display:none}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+h2{font-size:15px;margin:0 0 10px}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+@media (max-width:900px){.grid2{grid-template-columns:1fr}}
+.cat{display:inline-block;padding:1px 7px;border-radius:6px;font-weight:700;font-size:12px;color:#111}
+.cat.WTF{background:var(--WTF)}.cat.FUN{background:var(--FUN)}.cat.FAIL{background:var(--FAIL)}.cat.EPIC{background:var(--EPIC)}
+.stars{color:var(--FUN);letter-spacing:1px;white-space:nowrap}
+.stars.edit span{cursor:pointer;color:#444b58}.stars.edit span.on{color:var(--FUN)}
+kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px;font-size:11px;color:var(--muted);font-family:inherit}
+
+/* Collecte */
+.form{display:grid;grid-template-columns:1fr;gap:8px}
+.form .row input[type=text]{flex:1;min-width:200px}
+.job{border-top:1px solid var(--line);padding:8px 0}
+.job pre{margin:6px 0 0;white-space:pre-wrap;font:12px/1.4 ui-monospace,Consolas,monospace;color:var(--muted);max-height:260px;overflow:auto}
+.st{font-size:12px;padding:1px 7px;border-radius:6px;background:var(--panel2)}
+.st.erreur{background:#5a1d1d}.st.terminé{background:#163d27}.st.en\ cours{background:#4a3a10}
+.cmd{display:block;margin:4px 0;padding:6px 8px;background:var(--bg);border-radius:6px;font:12px/1.4 ui-monospace,Consolas,monospace;
+  white-space:pre-wrap;word-break:break-all;user-select:all}
+
+/* Tri */
+#tri{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px}
+@media (max-width:1000px){#tri{grid-template-columns:1fr}}
+.player{position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:16/9;max-width:100%}
+.player video{width:100%;height:100%;display:block;background:#000}
+.bar{position:relative;height:8px;background:var(--panel2);border-radius:4px;margin-top:8px;cursor:pointer}
+.bar .win{position:absolute;top:0;bottom:0;background:#ff4fa355;border-left:2px solid var(--accent);border-right:2px solid var(--accent)}
+.bar .pos{position:absolute;top:-3px;bottom:-3px;width:2px;background:#fff}
+.cats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
+.cats button{padding:16px 6px;font-size:18px;font-weight:800;border-width:2px;color:var(--text)}
+.cats button small{display:block;font-size:11px;font-weight:400;color:var(--muted)}
+.cats button.on{color:#111}
+.cats button[data-c=WTF].on{background:var(--WTF);border-color:var(--WTF)}
+.cats button[data-c=FUN].on{background:var(--FUN);border-color:var(--FUN)}
+.cats button[data-c=FAIL].on{background:var(--FAIL);border-color:var(--FAIL)}
+.cats button[data-c=EPIC].on{background:var(--EPIC);border-color:var(--EPIC)}
+.cats button[data-c=WTF]{border-color:var(--WTF)}.cats button[data-c=FUN]{border-color:var(--FUN)}
+.cats button[data-c=FAIL]{border-color:var(--FAIL)}.cats button[data-c=EPIC]{border-color:var(--EPIC)}
+.rate{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:10px}
+.rate button{font-size:22px;padding:8px 0;color:#555c6a}
+.rate button.on{color:var(--FUN);border-color:var(--FUN)}
+.rate.wait button{opacity:.4}
+.side .flag{display:flex;gap:8px;align-items:center;padding:6px 0}
+.why{background:var(--panel2);border-radius:8px;padding:8px 10px;margin:8px 0;font-size:13px}
+.empty{padding:60px 20px;text-align:center;color:var(--muted)}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:12px;color:var(--muted)}
+
+/* Best-of */
+#bo{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:16px}
+@media (max-width:1000px){#bo{grid-template-columns:1fr}}
+.list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.item{display:grid;grid-template-columns:auto 96px minmax(0,1fr) auto;gap:10px;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:10px;padding:6px 8px}
+.item img{width:96px;aspect-ratio:16/9;object-fit:cover;border-radius:6px;background:#000;cursor:pointer}
+.item .t{min-width:0}
+.item .t div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .acts{display:flex;gap:4px}
+.item .acts button{padding:4px 8px}
+.item.drag{opacity:.4}
+.item.over{border-color:var(--accent)}
+.handle{cursor:grab;color:var(--muted);padding:0 4px;user-select:none}
+.num{color:var(--muted);font-variant-numeric:tabular-nums;width:22px;text-align:right}
+.gauge{height:10px;background:var(--panel2);border-radius:5px;overflow:hidden;margin:8px 0}
+.gauge div{height:100%;background:var(--ok)}
+.gauge.over div{background:var(--warn)}
+.warns{margin:8px 0;padding:0;list-style:none}
+.warns li{background:#3a2a0a;border:1px solid #6b4c10;border-radius:8px;padding:6px 10px;margin-bottom:6px;font-size:13px}
+.total{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+
+/* Modale */
+.modal{position:fixed;inset:0;background:#000b;z-index:20;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;width:min(980px,100%);max-height:100%;overflow:auto}
+table{width:100%;border-collapse:collapse}
+td,th{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{color:var(--muted);font-weight:500;font-size:12px}
+.tablewrap{overflow-x:auto}
+#mTrim{z-index:25}  /* au-dessus de la liste des extraits d'une VOD */
+@keyframes flash{0%,100%{background:var(--panel2)}25%,75%{background:var(--accent);color:#fff}}
+.flash{animation:flash 1.6s ease-in-out 2;outline:2px solid var(--accent)}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);
+  padding:8px 14px;border-radius:10px;z-index:30}
+</style>
+</head>
+<body>
+<header>
+  <h1>Best-of <b>GTA 6</b></h1>
+  <nav>
+    <button data-v="collecte">Collecte</button>
+    <button data-v="tri">Tri <span class="badge" id="nNew">0</span></button>
+    <button data-v="bestof">Best-of <span class="badge" id="nBo" style="background:#444b58">0:00</span></button>
+    <button data-v="sources">Sources</button>
+  </nav>
+  <span class="me small">Trié par : <a href="#" id="meName"></a></span>
+</header>
+
+<main>
+<!-- ================= COLLECTE ================= -->
+<section class="view" id="v-collecte">
+  <div class="grid2" style="grid-template-columns:minmax(0,3fr) minmax(0,2fr)">
+    <div>
+      <div class="panel">
+        <div class="row" style="justify-content:space-between">
+          <h2 style="margin:0">VODs des dernières 24 h</h2>
+          <div class="row">
+            <label class="small muted"><input type="checkbox" id="vGta" checked> GTA uniquement</label>
+            <label class="small muted" title="Whisper transcrit les passages repérés, Claude garde les meilleurs et propose catégorie et note"><input type="checkbox" id="vAi"> 🤖 IA (Claude)</label>
+            <label class="small muted">Extraits max / vidéo <input type="number" id="vMax" min="1" max="50" style="width:60px"></label>
+            <button id="vScan">↻ Actualiser</button>
+            <button class="primary" id="vAll">Analyser les nouvelles</button>
+          </div>
+        </div>
+        <p class="small muted" id="vInfo" style="margin:6px 0 0"></p>
+        <div class="list" id="vList"></div>
+      </div>
+
+      <details class="panel" style="margin-top:16px" id="fBox">
+        <summary style="cursor:pointer"><b>Streamers suivis</b> <span class="muted small" id="fCount"></span></summary>
+        <div class="row" style="margin-top:10px" id="fList"></div>
+        <div class="row" style="margin-top:10px">
+          <select id="fP"><option value="twitch">Twitch</option><option value="youtube">YouTube</option><option value="kick">Kick</option></select>
+          <input type="text" id="fH" placeholder="pseudo (ex. gotaga, @Squeezie)" style="width:200px">
+          <input type="text" id="fName" placeholder="nom affiché" style="width:140px">
+          <button id="fAdd">Ajouter</button>
+        </div>
+      </details>
+
+      <details class="panel" style="margin-top:16px">
+        <summary style="cursor:pointer"><b>Ajouter une vidéo à la main</b> <span class="muted small">(lien ou fichier)</span></summary>
+        <div class="form" style="margin-top:10px">
+          <input type="text" id="cIn" placeholder="Lien Twitch / YouTube / Kick ou chemin d'un fichier">
+          <div class="row">
+            <label class="small muted">Streamer <input type="text" id="cStr" placeholder="auto" style="width:140px"></label>
+            <button class="primary" id="cGo">Analyser</button>
+            <label class="small muted">ou envoyer un fichier : <input type="file" id="cFile" accept="video/*"></label>
+          </div>
+        </div>
+      </details>
+    </div>
+    <div>
+    <div class="panel">
+      <h2>Machines</h2>
+      <p class="small muted" style="margin-top:0">Chaque machine analyse des VODs chez elle (chat, audio, Whisper) ; ce PC demande
+        ensuite à Claude et télécharge les extraits.</p>
+      <div id="maList" class="small"></div>
+      <details style="margin-top:10px">
+        <summary style="cursor:pointer"><b>Ajouter une machine</b> <span class="muted small">(PC d'un ami)</span></summary>
+        <div class="form" style="margin-top:10px">
+          <label class="small muted">Adresse Tailscale du serveur
+            <input type="text" id="maUrl" placeholder="https://bestof.tailXXXX.ts.net" style="width:100%"></label>
+          <label class="small muted">Dépôt GitHub <input type="text" id="maGit" placeholder="pseudo/bestof" style="width:100%"></label>
+          <div class="row"><button id="maSave">Enregistrer</button></div>
+          <div class="row"><input type="text" id="maNew" placeholder="nom de la machine (ex. PC-Jean)" style="flex:1">
+            <button class="primary" id="maAdd">Créer</button></div>
+          <div id="maOut"></div>
+        </div>
+      </details>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <h2>Tâches</h2>
+      <p class="small muted" style="margin-top:0">Chaque VOD est analysée en entier avec la détection de <i>gta6-clipper</i> :
+        clips créés par les viewers (Twitch), pics de chat comparés au rythme normal du streamer, et audio (rires, cris, crashs).
+        Les meilleurs moments sont téléchargés en 16:9 1080p puis arrivent dans l'onglet Tri. Compter quelques minutes par VOD.</p>
+      <div id="jobs" class="small muted">Aucune tâche.</div>
+    </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= TRI ================= -->
+<section class="view" id="v-tri" hidden>
+  <div id="tri">
+    <div>
+      <div class="player"><video id="tv" playsinline preload="auto"></video></div>
+      <div class="bar" id="tbar"><div class="win" id="twin"></div><div class="pos" id="tpos"></div></div>
+      <div class="row" style="margin-top:10px">
+        <button id="tMute" class="ghost" title="Couper / remettre le son (M)">🔊</button>
+        <input type="range" id="tVol" min="0" max="100" step="5" style="width:180px;padding:0" aria-label="Volume">
+        <span id="tVolV" class="small muted" style="width:40px"></span>
+        <span class="small muted"><kbd>+</kbd> <kbd>−</kbd> volume</span>
+      </div>
+      <div class="cats" id="tcats"></div>
+      <div class="rate wait" id="trate"></div>
+      <div class="row" style="margin-top:12px;justify-content:space-between">
+        <div class="row">
+          <button id="tTrash">✕ Poubelle <kbd>X</kbd></button>
+          <button id="tLater">Plus tard <kbd>↓</kbd></button>
+          <button id="tUndo">⟲ Annuler <kbd>Z</kbd></button>
+        </div>
+        <div class="row">
+          <button id="tIn">Début ici <kbd>I</kbd></button>
+          <button id="tOut">Fin ici <kbd>O</kbd></button>
+        </div>
+      </div>
+      <div class="row panel" style="margin-top:10px;padding:8px 12px;justify-content:space-between">
+        <div class="row">
+          <span class="small muted">Début</span>
+          <button data-tn="in" data-d="-1" title="Commencer 1 s plus tôt">−1 s</button>
+          <b id="tInV" style="width:56px;text-align:center"></b>
+          <button data-tn="in" data-d="1" title="Commencer 1 s plus tard (raccourcit)">+1 s</button>
+        </div>
+        <span>Durée <b id="tDurV"></b></span>
+        <div class="row">
+          <span class="small muted">Fin</span>
+          <button data-tn="out" data-d="-1" title="Finir 1 s plus tôt (raccourcit)">−1 s</button>
+          <b id="tOutV" style="width:56px;text-align:center"></b>
+          <button data-tn="out" data-d="1" title="Finir 1 s plus tard">+1 s</button>
+        </div>
+      </div>
+      <p class="small muted" style="margin:6px 0 0">Astuce : tu peux aussi attraper les bords roses de la barre et les faire glisser.</p>
+    </div>
+    <div class="side panel">
+      <div id="tmeta" class="empty">Chargement…</div>
+      <div id="tflags" hidden>
+        <h2 style="margin-top:12px">Signaler</h2>
+        <label class="flag"><input type="checkbox" data-f="radio"> Radio / musique <kbd>R</kbd></label>
+        <label class="flag"><input type="checkbox" data-f="cinematic"> Cinématique / fin d'histoire <kbd>C</kbd></label>
+        <label class="flag"><input type="checkbox" data-f="violence"> Violence graphique <kbd>V</kbd></label>
+      </div>
+      <h2 style="margin-top:14px">Raccourcis</h2>
+      <div class="keys">
+        <span><kbd>Q</kbd>/<kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd></span><span>WTF · FUN · FAIL · EPIC</span>
+        <span><kbd>1</kbd>…<kbd>5</kbd></span><span>note (valide et passe au suivant)</span>
+        <span><kbd>Espace</kbd></span><span>pause / lecture</span>
+        <span><kbd>←</kbd> <kbd>→</kbd></span><span>reculer / avancer de 3 s</span>
+        <span><kbd>M</kbd></span><span>couper le son</span>
+        <span><kbd>+</kbd> <kbd>−</kbd></span><span>volume ±5 %</span>
+        <span><kbd>I</kbd> <kbd>O</kbd></span><span>régler début / fin ici</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= BEST-OF ================= -->
+<section class="view" id="v-bestof" hidden>
+  <div id="bo">
+    <div class="panel">
+      <h2>Extraits gardés</h2>
+      <div class="row">
+        <select id="lCat"><option value="">Toutes catégories</option></select>
+        <select id="lMin"><option value="0">Toutes notes</option><option value="3">★3 et +</option><option value="4">★4 et +</option><option value="5">★5</option></select>
+        <select id="lSort"><option value="rating">Tri : note</option><option value="dur">Tri : durée</option><option value="added">Tri : récents</option><option value="streamer">Tri : streamer</option></select>
+        <select id="lStatus"><option value="kept">Gardés</option><option value="used">Déjà utilisés</option><option value="trash">Poubelle</option></select>
+        <input type="text" id="lQ" placeholder="Streamer…" style="width:120px">
+      </div>
+      <div class="list" id="lib"></div>
+    </div>
+    <div class="panel">
+      <div class="row" style="justify-content:space-between">
+        <input type="text" id="pName" style="font-weight:700;font-size:15px;flex:1;min-width:160px">
+        <label class="small muted">Objectif <input type="number" id="pTarget" min="1" max="60" style="width:60px"> min</label>
+      </div>
+      <div class="row" style="margin-top:10px;justify-content:space-between">
+        <span class="total" id="pTotal">0:00</span>
+        <span class="muted small" id="pCount"></span>
+      </div>
+      <div class="gauge" id="pGauge"><div></div></div>
+      <ul class="warns" id="pWarn"></ul>
+      <div class="row">
+        <button id="pAuto" title="Le meilleur en ouverture, le 2e meilleur en final, le reste au hasard sans le même streamer ni la même catégorie deux fois de suite (nouveau tirage à chaque clic)">Ordre auto</button>
+        <button id="pFill" title="Ajoute les meilleurs extraits gardés jusqu'à l'objectif">Remplir jusqu'à l'objectif</button>
+        <button id="pClear" class="ghost">Vider</button>
+        <span style="flex:1"></span>
+        <button id="pPreview" title="Joue les extraits à la suite, comme la vidéo finale">▶ Aperçu</button>
+        <button class="primary" id="pExport">Exporter</button>
+      </div>
+      <div class="list" id="proj"></div>
+      <h2 style="margin-top:20px">Exports</h2>
+      <div class="row small muted">
+        <label>Images/s <select id="sFps"><option value="auto">auto</option><option value="30">30</option><option value="60">60</option></select></label>
+        <label><input type="checkbox" id="sLower"> lien du streamer en haut à gauche</label>
+        <a href="/api/description.txt" target="_blank">Aperçu description YouTube</a>
+        <a href="/api/sources.csv">Tableau des sources (CSV)</a>
+      </div>
+      <div id="exps" class="small" style="margin-top:8px"></div>
+      <div class="row" style="margin-top:16px">
+        <button id="pNew" class="ghost">Terminer ce best-of et en commencer un nouveau</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SOURCES ================= -->
+<section class="view" id="v-sources" hidden>
+  <div class="panel">
+    <h2>Sources et autorisations</h2>
+    <p class="small muted" style="margin-top:0">Le nom et le lien du streamer servent aux crédits de la description YouTube. Mets l'autorisation à jour au fil des réponses.</p>
+    <div class="tablewrap"><table id="srcT"></table></div>
+  </div>
+</section>
+</main>
+
+<div class="modal" id="mTrim" hidden>
+  <div class="box">
+    <div class="row" style="justify-content:space-between"><h2 id="mTitle" style="margin:0"></h2><button id="mClose">Fermer</button></div>
+    <div class="player" style="margin-top:10px"><video id="mv" playsinline controls></video></div>
+    <div class="bar" id="mbar"><div class="win" id="mwin"></div><div class="pos" id="mpos"></div></div>
+    <div class="row" style="margin-top:10px;justify-content:space-between">
+      <div class="row">
+        <button id="mIn">Début ici</button>
+        <button data-n="in" data-d="-0.5">−0,5 s</button><button data-n="in" data-d="0.5">+0,5 s</button>
+        <span class="muted">Début <b id="mInV"></b></span>
+      </div>
+      <div class="row">
+        <span class="muted">Fin <b id="mOutV"></b></span>
+        <button data-n="out" data-d="-0.5">−0,5 s</button><button data-n="out" data-d="0.5">+0,5 s</button>
+        <button id="mOut">Fin ici</button>
+      </div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="mPlay">▶ Lire l'extrait</button>
+      <span class="muted">Durée : <b id="mDur"></b></span>
+      <span style="flex:1"></span>
+      <select id="mCat"></select>
+      <span class="stars edit" id="mStars"></span>
+      <button class="primary" id="mSave">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="mPrev" hidden>
+  <div class="box">
+    <div class="row" style="justify-content:space-between"><h2 id="pvTitle" style="margin:0"></h2><button id="pvClose">Fermer</button></div>
+    <div class="player" style="margin-top:10px"><video id="pv" playsinline></video>
+      <span id="pvCredit" style="position:absolute;left:2%;top:3.5%;background:#0008;color:#fff;font:600 clamp(10px,1.8vw,18px) Poppins,system-ui,sans-serif;padding:.3em .6em"></span></div>
+    <div class="gauge" style="margin-top:8px"><div id="pvBar" style="width:0"></div></div>
+    <div class="row" style="justify-content:space-between">
+      <div class="row"><button id="pvPrev">⏮ Précédent</button><button id="pvPlay">⏯</button><button id="pvNext">Suivant ⏭</button></div>
+      <span class="muted"><b id="pvTime">0:00</b> / <span id="pvTotal">0:00</span></span>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="mVod" hidden>
+  <div class="box">
+    <div class="row" style="justify-content:space-between"><h2 id="mvTitle" style="margin:0"></h2><button id="mvClose">Fermer</button></div>
+    <div id="mvInfo" class="small muted" style="margin-top:6px"></div>
+    <div class="list" id="mvList"></div>
+  </div>
+</div>
+
+<div class="modal" id="mName" hidden>
+  <div class="box" style="width:min(380px,100%)">
+    <h2>Qui trie ?</h2>
+    <p class="small muted">Ton prénom, pour savoir qui a trié quoi.</p>
+    <div class="row"><input type="text" id="nameIn" style="flex:1"><button class="primary" id="nameOk">OK</button></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const CATS = ["WTF","FUN","FAIL","EPIC"];
+const CAT_KEYS = {q:"WTF",a:"WTF",s:"FUN",d:"FAIL",f:"EPIC"};
+const CAT_HINT = {WTF:"Comportements improbables",FUN:"Situations hilarantes",FAIL:"Accidents, ratés",EPIC:"Cascades, poursuites"};
+const DIGIT = {Digit1:1,Digit2:2,Digit3:3,Digit4:4,Digit5:5,Numpad1:1,Numpad2:2,Numpad3:3,Numpad4:4,Numpad5:5};
+let S = null, view = "collecte";
+const store = {get(k){try{return localStorage.getItem(k)}catch(e){return null}}, set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+let me = store.get("bo_user") || "";
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = s => { s = Math.max(0, Math.round(s||0)); const h = Math.floor(s/3600), m = Math.floor(s%3600/60), x = s%60;
+  return h ? `${h}:${String(m).padStart(2,"0")}:${String(x).padStart(2,"0")}` : `${m}:${String(x).padStart(2,"0")}`; };
+const steps = a => a.steps ? " · en " + fmt(a.total) + " (" + a.steps.map(([n, d]) => esc(n) + " " + fmt(d)).join(", ") + ")" : "";
+const fmt1 = s => (Math.round(s*10)/10).toFixed(1).replace(".", ",") + " s";
+const dur = c => Math.max(0, c.out - c.in);
+const stars = n => n ? "★".repeat(n) + "<span style='color:#444b58'>" + "★".repeat(5-n) + "</span>" : "<span class='muted'>—</span>";
+const src = c => (S && S.sources.find(s => s.id === c.source_id)) || c.source || {};
+function toast(t){ const d = document.createElement("div"); d.className="toast"; d.textContent=t; document.body.append(d); setTimeout(()=>d.remove(), 2600); }
+
+async function api(path, body){
+  const o = {headers:{"X-User": encodeURIComponent(me||"?")}};
+  if (body !== undefined){ o.method="POST"; o.headers["Content-Type"]="application/json"; o.body=JSON.stringify(body); }
+  const r = await fetch(path, o);
+  if (r.status === 401){ document.body.innerHTML = "<main><h2>Accès privé</h2><p>Ouvre le lien complet (avec ?k=…).</p></main>"; throw new Error("401"); }
+  const j = await r.json();
+  if (!r.ok) { toast(j.error || "Erreur"); throw new Error(j.error); }
+  return j;
+}
+
+/* ---------------- navigation ---------------- */
+function show(v){
+  view = v; store.set("bo_view", v);
+  $$("nav button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
+  $$(".view").forEach(s => s.hidden = s.id !== "v-"+v);
+  if (v !== "tri") $("#tv").pause();
+  if (v === "tri" && !cur) loadNext();
+  render();
+}
+$$("nav button").forEach(b => b.onclick = () => show(b.dataset.v));
+
+async function refresh(){
+  S = await api("/api/state");
+  render();
+}
+function render(){
+  if (!S) return;
+  const nNew = S.clips.filter(c => c.status === "new").length;
+  $("#nNew").textContent = nNew;
+  const tot = S.project.items.map(id => S.clips.find(c => c.id === id)).filter(Boolean).reduce((a,c)=>a+dur(c),0);
+  $("#nBo").textContent = fmt(tot);
+  if (view === "collecte") { renderVods(); renderMachines(); renderJobs(); }
+  if (vodOpen && $("#mTrim").hidden) renderVod();
+  if (view === "bestof") renderBestof();
+  if (view === "sources") renderSources();
+  if (view === "tri" && !cur && nNew) loadNext();
+}
+
+/* ---------------- collecte ---------------- */
+$("#cGo").onclick = async () => {
+  const input = $("#cIn").value.trim(); if (!input) return toast("Colle un lien");
+  await api("/api/collect", {input, streamer:$("#cStr").value});
+  $("#cIn").value = ""; toast("Analyse lancée"); refresh();
+};
+$("#cIn").onkeydown = e => { if (e.key === "Enter") $("#cGo").click(); };
+
+/* VODs des dernières 24 h */
+const ago = h => h == null ? "" : h < 1 ? "il y a " + Math.max(1, Math.round(h*60)) + " min" : "il y a " + Math.round(h) + " h";
+const STATE = {"nouvelle":"", "en attente":"en file", "en cours":"analyse en cours…", "finalisation":"finalisation (Claude + extraits)", "analysée":"analysée"};
+const stateTxt = v => v.state === "en cours" && v.machine ? "en cours sur " + esc(v.machine) + (v.step ? " · " + esc(v.step) : "")
+  : STATE[v.state] || esc(v.state);
+$("#vGta").onchange = () => renderVods();
+$("#vScan").onclick = async () => { const r = await api("/api/scan", {}); toast(r.status === "déjà en cours" ? "Recherche déjà en cours" : "Recherche des VODs…"); refresh(); };
+$("#vAll").onclick = async () => {
+  const urls = shownVods().filter(v => v.state === "nouvelle" && !v.recording).map(v => v.url);
+  if (!urls.length) return toast("Aucune nouvelle VOD à analyser");
+  const r = await api("/api/analyze", {urls}); toast(r.queued + " VOD(s) en file d'analyse"); refresh(); };
+$("#vAi").onchange = async () => { S.settings = await api("/api/settings", {ai:$("#vAi").checked});
+  toast($("#vAi").checked ? "Mode IA activé : Claude choisit les moments" : "Mode IA désactivé : sélection automatique"); };
+$("#vMax").onchange = async () => { const n = parseInt($("#vMax").value, 10); if (!(n >= 1 && n <= 50)) return;
+  S.settings = await api("/api/settings", {max_moments:n}); toast(n + " extraits max par vidéo"); };
+const shownVods = () => S.vods.filter(v => !$("#vGta").checked || v.gta);
+function renderVods(){
+  if (document.activeElement !== $("#vMax")) $("#vMax").value = S.settings.max_moments;
+  $("#vAi").checked = S.settings.ai !== false;
+  const scanning = S.jobs.find(j => j.kind === "scan" && /attente|cours/.test(j.status));
+  const vs = shownVods(), hidden = S.vods.length - vs.length;
+  $("#vInfo").textContent = (scanning ? "Recherche en cours… " : "") + (S.vods_scan ? "Dernière recherche : " + S.vods_scan + ". " : "")
+    + (hidden ? hidden + " VOD(s) hors GTA masquée(s). " : "") + "Mise à jour automatique toutes les heures.";
+  $("#vList").innerHTML = vs.length ? vs.map(v => `<div class="item" style="grid-template-columns:120px minmax(0,1fr) auto">
+      ${v.thumb ? `<img src="${esc(v.thumb)}" alt="" style="width:120px" referrerpolicy="no-referrer">` : `<div style="width:120px;aspect-ratio:16/9;background:#000;border-radius:6px"></div>`}
+      <div class="t">
+        <div><b>${esc(v.streamer)}</b> <span class="muted small">${esc(v.platform)} · ${fmt(v.duration)} · ${ago(v.age_h)}${v.game ? " · " + esc(v.game) : ""}</span></div>
+        <div class="small muted" title="${esc(v.title)}"><a href="${esc(v.url)}" target="_blank" rel="noopener">${esc(v.title || "(sans titre)")}</a></div>
+        <div class="small">${v.recording ? "<span style='color:var(--warn)'>● stream encore en cours : attends la fin</span>"
+          : v.state === "analysée" ? `<span style="color:var(--ok)">✓ analysée${v.analyses.length ? " (" + esc(v.analyses[v.analyses.length-1].mode)
+               + (v.analyses[v.analyses.length-1].total ? ", " + fmt(v.analyses[v.analyses.length-1].total) : "") + ")" : ""}</span>
+             <span class="muted">· ${v.counts.new} à trier · ${v.counts.kept} gardé(s) · ${v.counts.trash} poubelle</span>
+             ${v.clips ? `<a href="#" data-see="${esc(v.source_id)}">voir les extraits</a>` : ""}`
+          : v.state !== "nouvelle" ? `<span style="color:var(--warn)">${stateTxt(v)}</span>`
+          : v.last_error ? `<span style="color:var(--warn)" title="${esc(v.last_error)}">⚠ échec${v.fails > 1 ? " (" + v.fails + " fois, relance manuelle)" : ""} : ${esc(v.last_error.slice(0, 140))}</span>` : ""}</div>
+      </div>
+      <div class="acts">${v.recording || /attente|cours|finalisation/.test(v.state) ? "" :
+        `<button data-an="${esc(v.url)}">${v.state === "analysée" ? "Réanalyser" : "Analyser"}</button>`}</div></div>`).join("")
+    : `<div class="empty">${scanning ? "Recherche des VODs…" : "Aucune VOD de moins de 24 h" + (hidden ? " sur GTA (décoche « GTA uniquement » pour tout voir)" : "") + ". Vérifie la liste des streamers suivis."}</div>`;
+  $$("[data-an]").forEach(b => b.onclick = async () => { await api("/api/analyze", {urls:[b.dataset.an]}); toast("Analyse lancée"); refresh(); });
+  $$("[data-see]").forEach(a => a.onclick = e => { e.preventDefault(); openVod(a.dataset.see); });
+  renderFollow();
+}
+function renderFollow(){
+  const F = S.follow; if ($("#fBox").contains(document.activeElement) && document.activeElement.type === "text") return;
+  $("#fCount").textContent = `(${F.streamers.filter(s => s.on).length} actifs sur ${F.streamers.length})`;
+  $("#fList").innerHTML = F.streamers.map((s,i) => `<label class="st" style="padding:4px 8px;display:inline-flex;gap:6px;align-items:center">
+    <input type="checkbox" data-fi="${i}" ${s.on ? "checked" : ""}> ${esc(s.name)} <span class="muted">${s.platform === "twitch" ? "Twitch" : s.platform === "youtube" ? "YT" : "Kick"}${s.lang ? " · " + esc(s.lang) : ""}</span>
+    <a href="#" data-fx="${i}" title="Retirer">✕</a></label>`).join("");
+  $$("[data-fi]").forEach(c => c.onchange = () => { F.streamers[+c.dataset.fi].on = c.checked; saveFollow(); });
+  $$("[data-fx]").forEach(a => a.onclick = e => { e.preventDefault(); F.streamers.splice(+a.dataset.fx, 1); saveFollow(); });
+}
+async function saveFollow(){
+  S.follow = await api("/api/follow", {streamers:S.follow.streamers});
+  renderFollow(); toast("Liste enregistrée : clique « Actualiser » pour relancer la recherche");
+}
+$("#fAdd").onclick = () => {
+  const h = $("#fH").value.trim(); if (!h) return toast("Indique le pseudo de la chaîne");
+  const k = h.toLowerCase().replace(/^@/, "");
+  const dup = S.follow.streamers.findIndex(s => s.platform === $("#fP").value && s.handle.toLowerCase().replace(/^@/, "") === k);
+  if (dup >= 0) {  // déjà suivi : on le montre au lieu de l'ajouter une 2e fois
+    const chip = $(`#fList [data-fi="${dup}"]`).closest("label");
+    chip.classList.remove("flash"); void chip.offsetWidth; chip.classList.add("flash");
+    chip.scrollIntoView({behavior: "smooth", block: "center"});
+    return toast(S.follow.streamers[dup].name + " est déjà suivi");
+  }
+  S.follow.streamers.unshift({platform:$("#fP").value, handle:h, name:$("#fName").value.trim() || h.replace(/^@/, ""), lang:"", on:true});
+  $("#fH").value = $("#fName").value = ""; saveFollow();
+};
+$("#cFile").onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  toast("Envoi de " + f.name + "…");
+  const q = new URLSearchParams({name:f.name, max:S.settings.max_moments, window:"", streamer:$("#cStr").value});
+  const r = await fetch("/api/upload?" + q, {method:"POST", body:f, headers:{"X-User":encodeURIComponent(me)}});
+  if (r.ok) toast("Fichier reçu, analyse lancée"); else toast("Échec de l'envoi");
+  e.target.value = ""; refresh();
+};
+const openJobs = new Set();
+async function renderJobs(){
+  const el = $("#jobs");
+  if (!S.jobs.length){ el.innerHTML = "Aucune tâche."; return; }
+  const full = {};
+  for (const id of openJobs) { try { full[id] = await api("/api/job/" + id); } catch(e){} }
+  el.innerHTML = S.jobs.map(j => `<div class="job">
+    <div class="row"><span class="st ${esc(j.status)}">${esc(j.status)}</span><b>${j.kind==="export"?"Export":j.kind==="scan"?"Recherche":j.kind==="finish"?"Finalisation":"Analyse"}</b>
+    <span class="muted" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(j.label)}</span>
+    <a href="#" data-j="${j.id}">${openJobs.has(j.id)?"réduire":"journal complet"}</a></div>
+    <pre>${esc((full[j.id]||j).lines.join("\n"))}</pre></div>`).join("");
+  el.querySelectorAll("[data-j]").forEach(a => a.onclick = e => { e.preventDefault(); const id=a.dataset.j;
+    openJobs.has(id)?openJobs.delete(id):openJobs.add(id); renderJobs(); });
+}
+
+/* Machines (moteurs) */
+const ASK = {stop_now: n => `Arrêter « ${n} » maintenant ? Les fichiers en cours repartent en file.`,
+  remove: n => `Retirer « ${n} » ? Sa ligne d'installation ne marchera plus.`};
+const mBtn = (m, action, label) => `<button class="small" data-mc="${action}" data-mn="${esc(m.name)}">${label}</button>`;
+// ne réécrit un champ que si la valeur du serveur a changé (sinon on effacerait la saisie en cours)
+const fillIn = (el, v) => { v = v || ""; if (el.dataset.v !== v && document.activeElement !== el) el.value = el.dataset.v = v; };
+function renderMachines(){
+  const M = S.machines || [], C = S.engine_conf || {}, now = Date.now() / 1000;
+  fillIn($("#maUrl"), C.public_url); fillIn($("#maGit"), C.github);
+  $("#maList").innerHTML = M.length ? M.map(m => `<div class="job">
+    <div class="row"><b>${esc(m.name)}</b>${m.local ? `<span class="muted">· ce PC</span>` : ""}
+      ${m.online ? `<span style="color:var(--ok)">● en ligne</span>`
+        : `<span class="muted">○ hors ligne (${m.last_seen ? "vu " + ago((now - m.last_seen) / 3600) : "jamais connectée"})</span>`}
+      <span class="st">${m.paused ? (m.jobs.length ? "en pause après les fichiers en cours" : "en pause") : "actif"}</span></div>
+    <div class="muted">${[m.os, m.gpu].filter(Boolean).map(esc).join(" · ")}</div>
+    ${m.version && !m.version_ok ? `<div style="color:var(--warn)">⚠ version différente : relance le moteur</div>` : ""}
+    ${m.paused && m.reason ? `<div style="color:var(--warn)">⚠ ${esc(m.reason)}</div>` : ""}
+    ${m.jobs.map(j => `<div style="margin-top:4px">▶ <b>${esc(j.streamer)}</b> ${esc(j.title || j.url)}
+      <div class="muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(j.line)}">${esc(j.step || "démarrage")}${
+        j.line ? " · " + esc(j.line) : ""}${j.started ? " · depuis " + fmt(now - j.started) : ""}</div></div>`).join("")}
+    <div class="row" style="margin-top:6px">${m.paused ? mBtn(m, "resume", "Reprendre") : mBtn(m, "pause", "Arrêter après les fichiers en cours")}
+      ${!m.paused || m.jobs.length ? mBtn(m, "stop_now", "Arrêter maintenant") : ""}${m.local ? "" : mBtn(m, "remove", "Retirer")}</div>
+    </div>`).join("") : `<span class="muted">Aucune machine.</span>`;
+  $$("[data-mc]").forEach(b => b.onclick = async () => {
+    const name = b.dataset.mn, action = b.dataset.mc;
+    if (ASK[action] && !confirm(ASK[action](name))) return;
+    await api("/api/machines/control", {name, action}); refresh(); });
+}
+$("#maSave").onclick = async () => {
+  await api("/api/engine-settings", {public_url:$("#maUrl").value.trim(), github:$("#maGit").value.trim()});
+  toast("Réglages enregistrés"); refresh(); };
+$("#maNew").onkeydown = e => { if (e.key === "Enter") $("#maAdd").click(); };
+$("#maAdd").onclick = async () => {
+  const name = $("#maNew").value.trim(); if (!name) return toast("Donne un nom à la machine (ex. PC-Jean)");
+  const r = await api("/api/machines/add", {name});
+  const cmd = t => `<code class="cmd">${esc(t)}</code><button class="small" data-copy>Copier</button>`;
+  $("#maNew").value = "";
+  $("#maOut").innerHTML = `<div class="why"><b>Machine « ${esc(r.name)} » créée.</b> Envoie ceci à ton ami :
+    <ol style="margin:6px 0 0;padding-left:20px">
+      <li>Installer Tailscale (<a href="https://tailscale.com/download" target="_blank" rel="noopener">tailscale.com/download</a>),
+        se connecter, puis accepter l'invitation ou le partage que tu lui envoies.</li>
+      <li><b>Windows</b> : appuyer sur la touche Windows, taper « PowerShell », Entrée, coller cette ligne, Entrée :${cmd(r.win)}
+        <b>Mac</b> : ouvrir « Terminal », coller cette ligne, Entrée :${cmd(r.mac)}</li>
+      <li>Ensuite, pour relancer le moteur : double-clic sur « Moteur Best-of » sur le Bureau.</li>
+    </ol></div>`;
+  $$("#maOut [data-copy]").forEach(b => b.onclick = async () => {
+    const c = b.previousElementSibling;
+    try { await navigator.clipboard.writeText(c.textContent); toast("Ligne copiée"); }
+    catch(e) { getSelection().selectAllChildren(c); toast("Ligne sélectionnée : fais Ctrl+C"); }  // presse-papiers absent hors HTTPS
+  });
+  refresh();
+};
+
+/* ---------------- tri ---------------- */
+let cur = null, sel = {cat:null, rating:null, flags:{}}, hist = [], skip = new Set(), loading = false;
+const tv = $("#tv");
+
+/* volume : 25 % par défaut, mémorisé, appliqué au tri et à la fenêtre de réglage */
+let vol = (() => { const v = store.get("bo_vol"); return v === null || isNaN(+v) ? 25 : +v; })(), muted = false;
+function applyVol(){
+  vol = Math.max(0, Math.min(100, Math.round(vol / 5) * 5)); store.set("bo_vol", vol);
+  for (const v of [tv, $("#mv"), $("#pv")]) { v.volume = vol / 100; v.muted = muted || vol === 0; }
+  $("#tVol").value = vol; $("#tVolV").textContent = vol + " %";
+  $("#tMute").textContent = muted || vol === 0 ? "🔇" : vol < 40 ? "🔉" : "🔊";
+}
+function setVol(v){ vol = v; muted = false; applyVol(); }
+$("#tVol").oninput = e => setVol(+e.target.value);
+$("#tMute").onclick = () => { muted = !muted; applyVol(); };
+$("#tcats").innerHTML = CATS.map((c,i) => `<button data-c="${c}">${c}<small>${CAT_HINT[c]} · ${["Q","S","D","F"][i]}</small></button>`).join("");
+$("#trate").innerHTML = [1,2,3,4,5].map(n => `<button data-r="${n}" title="${n}/5">${"★".repeat(n)}</button>`).join("");
+$$("#tcats button").forEach(b => b.onclick = () => chooseCat(b.dataset.c));
+$$("#trate button").forEach(b => b.onclick = () => chooseRating(+b.dataset.r));
+$$("#tflags input").forEach(i => i.onchange = () => { sel.flags[i.dataset.f] = i.checked; });
+
+async function loadNext(){
+  if (loading) return; loading = true;
+  try {
+    const r = await api("/api/next?skip=" + [...skip].join(","));
+    showClip(r.clips[0] || null, r.remaining);
+    r.clips.slice(1).forEach(c => { const v = document.createElement("video"); v.preload = "auto"; v.muted = true; v.src = "/files/" + c.file; });
+  } finally { loading = false; }
+}
+function showClip(c, remaining){
+  cur = c; sel = {cat:null, rating:null, flags:{}};
+  $$("#tflags input").forEach(i => i.checked = false);
+  updateTriButtons();
+  if (!c){
+    tv.removeAttribute("src"); tv.load();
+    $("#tmeta").className = "empty";
+    $("#tmeta").innerHTML = skip.size ? `Plus rien à trier, sauf ${skip.size} extrait(s) mis de côté. <br><br><button id="tAgain">Les revoir</button>`
+      : "Rien à trier pour l'instant.<br>Lance une analyse dans l'onglet Collecte.";
+    const again = $("#tAgain"); if (again) again.onclick = () => { skip.clear(); loadNext(); };
+    $("#tflags").hidden = true; return;
+  }
+  const s = c.source || {};
+  $("#tmeta").className = "";
+  $("#tmeta").innerHTML = `<h2 style="margin:0">${esc(s.streamer || "?")}</h2>
+    <div class="small muted">${esc(s.title || "")}</div>
+    ${c.ai && c.ai.category ? `<div class="why" style="border:1px dashed var(--accent)">🤖 Claude propose
+      <span class="cat ${c.ai.category}">${c.ai.category}</span> <span class="stars">${stars(c.ai.rating)}</span>
+      <div class="small">${esc(c.ai.reason || "")}</div><div class="small muted"><kbd>Entrée</kbd> pour valider sa proposition</div></div>` : ""}
+    <div class="why">${esc((c.why || "").replace(/^IA : [^·]*· /, ""))}</div>
+    <div class="small muted">Durée ${fmt1(dur(c))} · à ${fmt(c.src_start + c.in)} dans la VOD · score ${c.score}
+    · <a href="${esc(s.url || "#")}" target="_blank" rel="noopener">source</a></div>
+    <div class="small muted" style="margin-top:6px">${remaining} à trier</div>`;
+  $("#tflags").hidden = false;
+  tv.src = "/files/" + c.file;
+  tv.currentTime = c.in;
+  applyVol();
+  tv.play().catch(() => { tv.muted = true; tv.play().catch(()=>{}); });  // le navigateur bloque le son avant le 1er clic
+  drawBar();
+}
+function updateTriButtons(){
+  $$("#tcats button").forEach(b => b.classList.toggle("on", b.dataset.c === sel.cat));
+  $$("#trate button").forEach(b => b.classList.toggle("on", sel.rating && +b.dataset.r <= sel.rating));
+  $("#trate").classList.toggle("wait", !sel.cat);
+  $("#tUndo").disabled = !hist.length;
+}
+function chooseCat(c){ if (!cur) return; sel.cat = c; updateTriButtons(); if (sel.rating) commit(); }
+function chooseRating(n){ if (!cur) return; sel.rating = n; updateTriButtons(); if (sel.cat) commit(); else toast("Choisis aussi une catégorie"); }
+async function commit(){
+  const c = cur; if (!c) return; cur = null;
+  await api("/api/clip/" + c.id, {status:"kept", category:sel.cat, rating:sel.rating, flags:sel.flags, in:c.in, out:c.out});
+  hist.push(c.id); toast(`${sel.cat} ${"★".repeat(sel.rating)} — gardé`); loadNext(); refreshSoon();
+}
+async function trash(){ const c = cur; if (!c) return; cur = null;
+  await api("/api/clip/" + c.id, {status:"trash"}); hist.push(c.id); toast("À la poubelle"); loadNext(); refreshSoon(); }
+function later(){ if (!cur) return; skip.add(cur.id); cur = null; loadNext(); }
+async function undo(){
+  const id = hist.pop(); if (!id) return;
+  const c = await api("/api/clip/" + id, {status:"new"});
+  c.source = src(c); showClip(c, "?"); refreshSoon();
+}
+function setEdge(which){
+  if (!cur) return; const t = tv.currentTime;
+  if (which === "in" && t < cur.out - .5) cur.in = +t.toFixed(2);
+  if (which === "out" && t > cur.in + .5) cur.out = +t.toFixed(2);
+  drawBar(); toast(which === "in" ? "Début réglé" : "Fin réglée");
+}
+$("#tTrash").onclick = trash; $("#tLater").onclick = later; $("#tUndo").onclick = undo;
+$("#tIn").onclick = () => setEdge("in"); $("#tOut").onclick = () => setEdge("out");
+function drawBar(){
+  if (!cur || !cur.file_dur) return;
+  const D = cur.file_dur;
+  $("#twin").style.left = (cur.in/D*100) + "%"; $("#twin").style.width = ((cur.out-cur.in)/D*100) + "%";
+  $("#tpos").style.left = (tv.currentTime/D*100) + "%";
+  $("#tInV").textContent = fmt1(cur.in); $("#tOutV").textContent = fmt1(cur.out); $("#tDurV").textContent = fmt1(cur.out - cur.in);
+}
+function nudge(which, d){
+  if (!cur) return;
+  if (which === "in") { cur.in = Math.max(0, Math.min(cur.out - 1, +(cur.in + d).toFixed(2))); tv.currentTime = cur.in; }
+  else { cur.out = Math.min(cur.file_dur, Math.max(cur.in + 1, +(cur.out + d).toFixed(2))); tv.currentTime = Math.max(cur.in, cur.out - 3); }
+  drawBar();
+}
+$$("[data-tn]").forEach(b => b.onclick = () => nudge(b.dataset.tn, +b.dataset.d));
+tv.onended = () => { if (cur) { tv.currentTime = cur.in; tv.play().catch(()=>{}); } };  // idem dans le Tri : on reboucle
+tv.ontimeupdate = () => { if (cur && !dragEdge && (tv.currentTime >= cur.out || tv.currentTime < cur.in - .3)) { tv.currentTime = cur.in; } drawBar(); };
+/* barre : clic = se placer ; attraper un bord rose = régler début / fin */
+let dragEdge = null;
+$("#tbar").style.height = "14px";
+$("#tbar").onpointerdown = e => {
+  if (!cur) return;
+  const r = e.currentTarget.getBoundingClientRect(), t = (e.clientX - r.left)/r.width*cur.file_dur, tol = cur.file_dur * 12 / r.width;
+  dragEdge = Math.abs(t - cur.in) <= tol ? "in" : Math.abs(t - cur.out) <= tol ? "out" : null;
+  if (dragEdge) { e.currentTarget.setPointerCapture(e.pointerId); tv.pause(); } else tv.currentTime = t;
+};
+$("#tbar").onpointermove = e => {
+  const r = e.currentTarget.getBoundingClientRect();
+  if (!cur) return;
+  const t = Math.max(0, Math.min(cur.file_dur, (e.clientX - r.left)/r.width*cur.file_dur)), tol = cur.file_dur * 12 / r.width;
+  e.currentTarget.style.cursor = dragEdge || Math.abs(t - cur.in) <= tol || Math.abs(t - cur.out) <= tol ? "ew-resize" : "pointer";
+  if (!dragEdge) return;
+  if (dragEdge === "in") cur.in = +Math.min(t, cur.out - 1).toFixed(2); else cur.out = +Math.max(t, cur.in + 1).toFixed(2);
+  tv.currentTime = dragEdge === "in" ? cur.in : cur.out; drawBar();
+};
+$("#tbar").onpointerup = () => { if (dragEdge) { const w = dragEdge; dragEdge = null;
+  tv.currentTime = w === "in" ? cur.in : Math.max(cur.in, cur.out - 3); tv.play().catch(()=>{}); } };
+
+document.addEventListener("keydown", e => {
+  if (view !== "tri" || !$("#mTrim").hidden || !$("#mName").hidden || !$("#mVod").hidden) return;
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) && e.target.type !== "checkbox") return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (k === "enter" && cur && cur.ai && cur.ai.category) {  // valide la proposition de Claude (catégorie + note)
+    e.preventDefault(); sel.cat = cur.ai.category; sel.rating = sel.rating || cur.ai.rating || 3; return commit(); }
+  if (CAT_KEYS[k]) return chooseCat(CAT_KEYS[k]);
+  if (DIGIT[e.code]) return chooseRating(DIGIT[e.code]);
+  const map = {x:trash, z:undo, backspace:undo, arrowdown:later, "[":()=>setEdge("in"), "]":()=>setEdge("out"), i:()=>setEdge("in"), o:()=>setEdge("out"),
+    " ":()=> tv.paused ? tv.play() : tv.pause(), arrowleft:()=> tv.currentTime -= 3, arrowright:()=> tv.currentTime += 3,
+    m:()=> { muted = !muted; applyVol(); }, "+":()=> setVol(vol + 5), "=":()=> setVol(vol + 5), "-":()=> setVol(vol - 5)};
+  const fl = {r:"radio", c:"cinematic", v:"violence"}[k];
+  if (fl && cur){ e.preventDefault(); const i = $(`#tflags input[data-f=${fl}]`); i.checked = !i.checked; sel.flags[fl] = i.checked; return; }
+  if (map[k]) { e.preventDefault(); map[k](); }
+});
+let rsT = null, dragging = false, tick = 0; function refreshSoon(){ clearTimeout(rsT); rsT = setTimeout(refresh, 400); }
+
+/* ---------------- best-of ---------------- */
+$("#lCat").innerHTML += CATS.map(c => `<option>${c}</option>`).join("");
+["#lCat","#lMin","#lSort","#lStatus"].forEach(s => $(s).onchange = renderBestof);
+$("#lQ").oninput = renderBestof;
+const projItems = () => S.project.items.map(id => S.clips.find(c => c.id === id)).filter(Boolean);
+async function saveProject(body){ S.project = await api("/api/project", body); refresh(); }
+
+function itemHTML(c, i, inProj){
+  const s = src(c), fl = c.flags || {};
+  const tags = [fl.radio?"🎵 radio":"", fl.cinematic?"🎬 cinématique":"", fl.violence?"🩸 violence":""].filter(Boolean).join(" · ");
+  return `<div class="item" data-id="${c.id}" ${inProj?'draggable="true"':""}>
+    ${inProj ? `<span class="row" style="gap:2px"><span class="handle" title="Glisser pour déplacer">⋮⋮</span><span class="num">${i+1}</span></span>` : "<span></span>"}
+    <img src="${c.thumb ? "/files/" + c.thumb : ""}" alt="" data-open="${c.id}" loading="lazy">
+    <div class="t">
+      <div>${c.category ? `<span class="cat ${c.category}">${c.category}</span>` : ""} <span class="stars">${stars(c.rating)}</span>
+        <b>${esc(s.streamer || "?")}</b> <span class="muted">${fmt1(dur(c))}</span></div>
+      <div class="small muted" title="${esc(c.why)}">${tags ? tags + " · " : ""}${esc(c.why || "")}${c.used_in ? " · utilisé dans " + esc(c.used_in) : ""}</div>
+    </div>
+    <div class="acts">${inProj
+      ? `<button data-up="${c.id}" title="Monter">↑</button><button data-down="${c.id}" title="Descendre">↓</button><button data-rm="${c.id}" title="Retirer">✕</button>`
+      : c.status === "trash" ? `<button data-restore="${c.id}">Remettre à trier</button>`
+      : `<button data-add="${c.id}" title="Ajouter au best-of">＋</button>`}</div></div>`;
+}
+function renderBestof(){
+  const pj = S.project, items = projItems();
+  if (document.activeElement !== $("#pName")) $("#pName").value = pj.name;
+  if (document.activeElement !== $("#pTarget")) $("#pTarget").value = Math.round(pj.target/60);
+  $("#sFps").value = S.settings.fps; $("#sLower").checked = !!S.settings.lower_third;
+  const tot = items.reduce((a,c)=>a+dur(c),0);
+  $("#pTotal").textContent = fmt(tot) + " / " + fmt(pj.target);
+  $("#pCount").textContent = items.length + " extraits";
+  $("#pGauge").classList.toggle("over", tot > pj.target*1.1);
+  $("#pGauge div").style.width = Math.min(100, tot/pj.target*100) + "%";
+  $("#pWarn").innerHTML = S.warnings.map(w => `<li>${esc(w)}</li>`).join("");
+  $("#proj").innerHTML = items.length ? items.map((c,i) => itemHTML(c,i,true)).join("")
+    : `<div class="empty">Ajoute des extraits avec ＋, ou clique « Remplir jusqu'à l'objectif ».</div>`;
+
+  const st = $("#lStatus").value, cat = $("#lCat").value, min = +$("#lMin").value, q = $("#lQ").value.toLowerCase();
+  let lib = S.clips.filter(c => !pj.items.includes(c.id) &&
+    (st === "trash" ? c.status === "trash" : st === "used" ? c.status === "kept" && c.used_in : c.status === "kept" && !c.used_in) &&
+    (!cat || c.category === cat) && (c.rating||0) >= min && (!q || (src(c).streamer||"").toLowerCase().includes(q)));
+  const so = $("#lSort").value;
+  lib.sort(so === "dur" ? (a,b)=>dur(b)-dur(a) : so === "added" ? (a,b)=>b.added.localeCompare(a.added)
+    : so === "streamer" ? (a,b)=>(src(a).streamer||"").localeCompare(src(b).streamer||"")
+    : (a,b)=>(b.rating||0)-(a.rating||0) || (b.score||0)-(a.score||0));
+  $("#lib").innerHTML = lib.length ? lib.map(c => itemHTML(c,0,false)).join("") : `<div class="empty">Aucun extrait ici.</div>`;
+
+  $("#exps").innerHTML = S.exports.length ? S.exports.map(x => `<div class="job"><b>${esc(x.project)}</b>
+    <span class="muted">${esc(x.created)} · ${fmt(x.dur)}</span><div class="row" style="margin-top:4px">
+    <a href="/files/${x.files.mp4}?dl=1">Vidéo MP4</a><a href="/files/${x.files.mp4}" target="_blank">regarder</a>
+    <a href="/files/${x.files.fcpxml}?dl=1">Timeline DaVinci (.fcpxml)</a>
+    <a href="/files/${x.files.description}" target="_blank">Description YouTube</a>
+    <a href="/files/${x.files.csv}?dl=1">Sources (CSV)</a></div>
+    <div class="muted">Dossier : data/${esc(x.dir)}</div></div>`).join("")
+    : `<span class="muted">Aucun export. Le MP4 et la timeline DaVinci (avec les segments) apparaîtront ici.</span>`;
+  const run = S.jobs.find(j => j.kind === "export" && /attente|cours/.test(j.status));
+  $("#pExport").disabled = !!run || !items.length;
+  $("#pExport").textContent = run ? "Export en cours…" : "Exporter";
+  if (run) $("#exps").insertAdjacentHTML("afterbegin", `<pre class="muted small">${esc(run.lines.join("\n"))}</pre>`);
+  wireLists();
+}
+function wireLists(){
+  const ids = () => S.project.items.slice();
+  $$("[data-add]").forEach(b => b.onclick = () => saveProject({items:[...ids(), b.dataset.add]}));
+  $$("[data-rm]").forEach(b => b.onclick = () => saveProject({items:ids().filter(i => i !== b.dataset.rm)}));
+  $$("[data-restore]").forEach(b => b.onclick = async () => { await api("/api/clip/"+b.dataset.restore, {status:"new"}); refresh(); });
+  $$("[data-up],[data-down]").forEach(b => b.onclick = () => {
+    const a = ids(), id = b.dataset.up || b.dataset.down, i = a.indexOf(id), j = i + (b.dataset.up ? -1 : 1);
+    if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; saveProject({items:a}); });
+  $$("[data-open]").forEach(im => im.onclick = () => openTrim(im.dataset.open));
+  let dragId = null;
+  $$("#proj .item").forEach(el => {
+    el.ondragstart = e => { dragging = true; dragId = el.dataset.id; el.classList.add("drag"); e.dataTransfer.effectAllowed = "move"; };
+    el.ondragend = () => { dragging = false; el.classList.remove("drag"); };
+    el.ondragover = e => { e.preventDefault(); el.classList.add("over"); };
+    el.ondragleave = () => el.classList.remove("over");
+    el.ondrop = e => { e.preventDefault(); el.classList.remove("over");
+      if (!dragId || dragId === el.dataset.id) return;
+      const a = ids().filter(i => i !== dragId), r = el.getBoundingClientRect();
+      let k = a.indexOf(el.dataset.id); if (e.clientY > r.top + r.height/2) k++;
+      a.splice(k, 0, dragId); saveProject({items:a}); };
+  });
+}
+$("#pName").onchange = () => saveProject({name:$("#pName").value});
+$("#pTarget").onchange = () => saveProject({target:Math.round(+$("#pTarget").value*60)});
+$("#pAuto").onclick = () => saveProject({auto:"order"});
+$("#pFill").onclick = () => saveProject({auto:"fill"});
+function confirmBtn(btn, label, fn){
+  if (btn.dataset.armed){ delete btn.dataset.armed; btn.textContent = btn.dataset.orig; fn(); return; }
+  btn.dataset.orig = btn.textContent; btn.dataset.armed = 1; btn.textContent = label;
+  setTimeout(() => { if (btn.dataset.armed){ delete btn.dataset.armed; btn.textContent = btn.dataset.orig; } }, 4000);
+}
+$("#pClear").onclick = e => confirmBtn(e.currentTarget, "Confirmer : vider ?", () => saveProject({items:[]}));
+$("#pNew").onclick = e => confirmBtn(e.currentTarget, "Confirmer : archiver ce best-of ?", () => saveProject({auto:"new"}));
+$("#pExport").onclick = async () => { await api("/api/export", {}); toast("Export lancé : ça peut prendre quelques minutes"); refresh(); };
+$("#sFps").onchange = $("#sLower").onchange = async () => {
+  S.settings = await api("/api/settings", {fps:$("#sFps").value, lower_third:$("#sLower").checked}); toast("Réglage enregistré"); };
+
+/* ---------------- modale réglage extrait ---------------- */
+let mc = null; const mv = $("#mv");
+$("#mCat").innerHTML = CATS.map(c => `<option>${c}</option>`).join("");
+function openTrim(id){
+  const c = S.clips.find(x => x.id === id); if (!c) return;
+  mc = {...c, flags:{...(c.flags||{})}};
+  $("#mTitle").textContent = (src(c).streamer || "?") + " — " + (c.why || "");
+  $("#mCat").value = c.category || "FUN";
+  mv.src = "/files/" + c.file; mv.currentTime = c.in;
+  $("#mTrim").hidden = false; drawM();
+}
+function drawM(){
+  if (!mc) return; const D = mc.file_dur;
+  $("#mwin").style.left = (mc.in/D*100)+"%"; $("#mwin").style.width = ((mc.out-mc.in)/D*100)+"%";
+  $("#mpos").style.left = (mv.currentTime/D*100)+"%";
+  $("#mInV").textContent = fmt1(mc.in); $("#mOutV").textContent = fmt1(mc.out); $("#mDur").textContent = fmt1(mc.out-mc.in);
+  $("#mStars").innerHTML = [1,2,3,4,5].map(n => `<span data-s="${n}" class="${n <= (mc.rating||0) ? "on" : ""}">★</span>`).join("");
+  $$("#mStars span").forEach(s => s.onclick = () => { mc.rating = +s.dataset.s; drawM(); });
+}
+mv.ontimeupdate = () => { if (mc && mv.dataset.clip && mv.currentTime >= mc.out) { mv.pause(); delete mv.dataset.clip; } drawM(); };
+$("#mbar").onclick = e => { const r = e.currentTarget.getBoundingClientRect(); mv.currentTime = (e.clientX-r.left)/r.width*mc.file_dur; };
+$("#mIn").onclick = () => { if (mv.currentTime < mc.out - .5) mc.in = +mv.currentTime.toFixed(2); drawM(); };
+$("#mOut").onclick = () => { if (mv.currentTime > mc.in + .5) mc.out = +mv.currentTime.toFixed(2); drawM(); };
+$$("#mTrim [data-n]").forEach(b => b.onclick = () => {
+  const n = b.dataset.n, v = Math.round((mc[n] + +b.dataset.d)*100)/100;
+  if (n === "in" && v >= 0 && v < mc.out - .5) mc.in = v;
+  if (n === "out" && v <= mc.file_dur && v > mc.in + .5) mc.out = v;
+  mv.currentTime = n === "in" ? mc.in : Math.max(mc.in, mc.out - 2); drawM(); });
+$("#mPlay").onclick = () => { mv.currentTime = mc.in; mv.dataset.clip = 1; mv.play(); };
+$("#mClose").onclick = () => { mv.pause(); $("#mTrim").hidden = true; mc = null; };
+$("#mSave").onclick = async () => {
+  await api("/api/clip/" + mc.id, {in:mc.in, out:mc.out, category:$("#mCat").value, rating:mc.rating||undefined});
+  $("#mClose").click(); toast("Extrait mis à jour"); refresh(); };
+
+/* ---------------- aperçu du best-of : les extraits à la suite, coupes comprises ---------------- */
+let pl = [], pi = 0;
+const pv = $("#pv");
+function pvShow(i){
+  if (i < 0 || i >= pl.length) { pv.pause(); return; }
+  pi = i; const c = pl[i], s = src(c);
+  pv.src = "/files/" + c.file + "#t=" + c.in;
+  pv.onloadedmetadata = () => { pv.currentTime = c.in; pv.play().catch(()=>{}); };
+  $("#pvCredit").textContent = S.settings.lower_third ? ((s.streamer_url || "").replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "") || s.streamer || "") : "";
+  $("#pvCredit").hidden = !$("#pvCredit").textContent;
+  $("#pvTitle").innerHTML = `${i + 1}/${pl.length} · <b>${esc(s.streamer || "?")}</b> ` +
+    (c.category ? `<span class="cat ${c.category}">${c.category}</span> ` : "") + `<span class="stars">${stars(c.rating)}</span>`;
+}
+pv.ontimeupdate = () => {
+  const c = pl[pi]; if (!c) return;
+  if (pv.currentTime >= c.out) return pvShow(pi + 1);
+  const done = pl.slice(0, pi).reduce((a, x) => a + dur(x), 0) + Math.max(0, pv.currentTime - c.in), tot = pl.reduce((a, x) => a + dur(x), 0);
+  $("#pvTime").textContent = fmt(done); $("#pvBar").style.width = (done / tot * 100) + "%";
+};
+$("#pPreview").onclick = () => {
+  pl = projItems(); if (!pl.length) return toast("Le best-of est vide");
+  $("#pvTotal").textContent = fmt(pl.reduce((a, x) => a + dur(x), 0));
+  $("#mPrev").hidden = false; applyVol(); pvShow(0);
+};
+pv.onended = () => pvShow(pi + 1);  // fin réglée au bout du fichier : timeupdate n'atteint jamais « out »
+$("#pvPrev").onclick = () => pvShow(Math.max(0, pi - 1));
+$("#pvNext").onclick = () => pvShow(pi + 1);
+$("#pvPlay").onclick = () => pv.paused ? pv.play() : pv.pause();
+$("#pvClose").onclick = () => { pv.pause(); pv.removeAttribute("src"); $("#mPrev").hidden = true; };
+
+/* ---------------- extraits d'une VOD ---------------- */
+let vodOpen = null;
+const ST = {new:"à trier", kept:"gardé", trash:"poubelle"};
+function openVod(sid){ vodOpen = sid; $("#mVod").hidden = false; renderVod(); }
+function renderVod(){
+  if (!vodOpen) return;
+  const s = S.sources.find(x => x.id === vodOpen) || {};
+  const cs = S.clips.filter(c => c.source_id === vodOpen).sort((a,b) => (a.src_start+a.in) - (b.src_start+b.in));
+  $("#mvTitle").textContent = (s.streamer || "?") + " — " + cs.length + " extrait(s)";
+  $("#mvInfo").innerHTML = `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title || "")}</a><br>` +
+    ((s.analyses || []).map(a => `Analyse du ${esc(a.date)} · mode ${esc(a.mode)} · ${a.signals} signaux · ${a.clips} extraits · ${esc(a.window)}${steps(a)}`).join("<br>") || "");
+  $("#mvList").innerHTML = cs.map(c => `<div class="item" style="grid-template-columns:96px minmax(0,1fr) auto">
+      <img src="${c.thumb ? "/files/" + c.thumb : ""}" alt="" data-play="${c.id}" title="Regarder / régler">
+      <div class="t">
+        <div><b>${fmt(c.src_start + c.in)}</b> dans la VOD · ${fmt1(dur(c))} ·
+          <span class="${c.status === "kept" ? "" : "muted"}">${ST[c.status]}</span>
+          ${c.category ? `<span class="cat ${c.category}">${c.category}</span> <span class="stars">${stars(c.rating)}</span>` : ""}
+          ${c.ai && c.ai.category ? `<span class="muted small">· 🤖 ${c.ai.category} ${"★".repeat(c.ai.rating || 0)}</span>` : ""}</div>
+        <div class="small muted" title="${esc(c.why)}">${esc(c.why || "")}</div>
+      </div>
+      <div class="acts">${c.status === "new" ? "" : `<button data-renew="${c.id}">Remettre à trier</button>`}</div></div>`).join("")
+    || `<div class="empty">Aucun extrait.</div>`;
+  $$("#mvList [data-play]").forEach(im => im.onclick = () => openTrim(im.dataset.play));
+  $$("#mvList [data-renew]").forEach(b => b.onclick = async () => { await api("/api/clip/" + b.dataset.renew, {status:"new"}); toast("Remis dans la pile de tri"); await refresh(); renderVod(); });
+}
+$("#mvClose").onclick = () => { $("#mVod").hidden = true; vodOpen = null; };
+
+/* ---------------- sources ---------------- */
+function renderSources(){
+  const cnt = id => S.clips.filter(c => c.source_id === id && c.status === "kept").length;
+  const t = $("#srcT");
+  if (document.activeElement && t.contains(document.activeElement)) return;
+  t.innerHTML = `<tr><th>Streamer</th><th>Chaîne (crédits)</th><th>Autorisation</th><th>Vidéo source</th><th>Gardés</th></tr>` +
+    S.sources.slice().sort((a,b) => b.added.localeCompare(a.added)).map(s => `<tr data-s="${s.id}">
+      <td><input type="text" data-k="streamer" value="${esc(s.streamer)}" style="width:150px"></td>
+      <td><input type="text" data-k="streamer_url" value="${esc(s.streamer_url)}" style="width:260px"></td>
+      <td><select data-k="auth">${S.auth.map(a => `<option ${a===s.auth?"selected":""}>${a}</option>`).join("")}</select></td>
+      <td class="small"><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)}</a><div class="muted">${esc(s.platform)} · ajouté ${esc(s.added)}</div></td>
+      <td>${cnt(s.id)}</td></tr>`).join("");
+  t.querySelectorAll("[data-k]").forEach(i => i.onchange = async () => {
+    await api("/api/source/" + i.closest("tr").dataset.s, {[i.dataset.k]: i.value}); toast("Enregistré"); refresh(); });
+}
+
+/* ---------------- démarrage ---------------- */
+function askName(){
+  $("#mName").hidden = false; $("#nameIn").value = me; $("#nameIn").focus();
+  const ok = () => { const v = $("#nameIn").value.trim(); if (!v) return; me = v; store.set("bo_user", v);
+    $("#meName").textContent = v; $("#mName").hidden = true; };
+  $("#nameOk").onclick = ok; $("#nameIn").onkeydown = e => { if (e.key === "Enter") ok(); };
+}
+$("#meName").onclick = e => { e.preventDefault(); askName(); };
+$("#meName").textContent = me || "?";
+applyVol();
+if (!me) askName();
+refresh().then(() => show(store.get("bo_view") || (S.clips.some(c => c.status === "new") ? "tri" : "collecte")));
+setInterval(() => { tick++; if (document.hidden || dragging || !$("#mTrim").hidden || !$("#mPrev").hidden) return;
+  const busy = S && (S.jobs.some(j => /attente|cours/.test(j.status)) || (S.machines || []).some(m => m.jobs.length));
+  if (busy || tick % 4 === 0) refresh(); }, 2500);
+</script>
+</body>
+</html>

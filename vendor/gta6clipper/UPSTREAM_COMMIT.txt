@@ -1,0 +1,2 @@
+1119d0d721e58e87032e81650b664f3af3daafc2 Fri Nov 20 19:27:46 2026 +0600
+Modifié localement : chat.py fetch_youtube timeout 300 -> 1800 s.

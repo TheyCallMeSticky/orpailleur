@@ -1,0 +1,8 @@
+yt-dlp[default,deno]   # téléchargement Twitch / YouTube / Kick ; deno = résout les protections de YouTube
+numpy             # détection audio (moments.py de gta6-clipper)
+faster-whisper     # mode IA : transcription locale (GPU NVIDIA si présent)
+av<19              # faster-whisper 1.2 ne marche pas avec av 19
+nvidia-cublas-cu12; sys_platform != "darwin"      # GPU : bibliothèques CUDA pour Whisper (inutile sans carte NVIDIA ; jamais sur Mac)
+nvidia-cudnn-cu12==9.*; sys_platform != "darwin"
+static-ffmpeg; sys_platform != "linux"            # ffmpeg + ffprobe sur les PC des amis (Windows, Mac)
+certifi            # certificats TLS pour le Python autonome de uv (Mac)

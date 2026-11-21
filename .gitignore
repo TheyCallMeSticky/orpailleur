@@ -1,0 +1,5 @@
+# données locales : vidéos, base, jeton d'accès (config.json), journaux — jamais dans le dépôt public
+data/
+.venv/
+__pycache__/
+*.pyc
