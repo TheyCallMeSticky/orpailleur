@@ -126,6 +126,7 @@ th{color:var(--muted);font-weight:500;font-size:12px}
     <button data-v="collecte">Collecte</button>
     <button data-v="tri">Tri <span class="badge" id="nNew">0</span></button>
     <button data-v="bestof">Best-of <span class="badge" id="nBo" style="background:#444b58">0:00</span></button>
+    <button data-v="machines">Machines</button>
     <button data-v="sources">Sources</button>
   </nav>
   <span class="me small">Trié par : <a href="#" id="meName"></a></span>
@@ -176,24 +177,6 @@ th{color:var(--muted);font-weight:500;font-size:12px}
     </div>
     <div>
     <div class="panel">
-      <h2>Machines</h2>
-      <p class="small muted" style="margin-top:0">Chaque machine analyse des VODs chez elle (chat, audio, Whisper) ; ce PC demande
-        ensuite à Claude et télécharge les extraits.</p>
-      <div id="maList" class="small"></div>
-      <details style="margin-top:10px">
-        <summary style="cursor:pointer"><b>Ajouter une machine</b> <span class="muted small">(PC d'un ami)</span></summary>
-        <div class="form" style="margin-top:10px">
-          <label class="small muted">Adresse Tailscale du serveur
-            <input type="text" id="maUrl" placeholder="https://bestof.tailXXXX.ts.net" style="width:100%"></label>
-          <label class="small muted">Dépôt GitHub <input type="text" id="maGit" placeholder="pseudo/bestof" style="width:100%"></label>
-          <div class="row"><button id="maSave">Enregistrer</button></div>
-          <div class="row"><input type="text" id="maNew" placeholder="nom de la machine (ex. PC-Jean)" style="flex:1">
-            <button class="primary" id="maAdd">Créer</button></div>
-          <div id="maOut"></div>
-        </div>
-      </details>
-    </div>
-    <div class="panel" style="margin-top:16px">
       <h2>Tâches</h2>
       <p class="small muted" style="margin-top:0">Chaque VOD est analysée en entier avec la détection de <i>gta6-clipper</i> :
         clips créés par les viewers (Twitch), pics de chat comparés au rythme normal du streamer, et audio (rires, cris, crashs).
@@ -318,6 +301,37 @@ th{color:var(--muted);font-weight:500;font-size:12px}
 </section>
 
 <!-- ================= SOURCES ================= -->
+<!-- ================= MACHINES ================= -->
+<section class="view" id="v-machines" hidden>
+  <div class="grid2">
+    <div class="panel">
+      <h2>Machines</h2>
+      <p class="small muted" style="margin-top:0">Chaque machine analyse des VODs chez elle (chat, audio, Whisper) ; ce PC demande
+        ensuite à Claude et télécharge les extraits.</p>
+      <div id="maList" class="small"></div>
+    </div>
+    <div class="panel">
+      <h2>Inviter un ami</h2>
+      <p class="small muted" style="margin-top:0">Tape son prénom : le site prépare tout le message à lui envoyer (Tailscale,
+        installation du moteur sur Windows ou Mac, lien pour trier). Un message par ami : il contient la clé de sa machine.</p>
+      <div class="row"><input type="text" id="maNew" placeholder="prénom (ex. Jean)" style="flex:1">
+        <button class="primary" id="maAdd">Créer le message</button></div>
+      <div id="maOut"></div>
+      <details style="margin-top:14px">
+        <summary style="cursor:pointer" class="small"><b>Réglages</b> <span class="muted">(une fois)</span></summary>
+        <div class="form" style="margin-top:10px">
+          <label class="small muted">Adresse Tailscale du serveur
+            <input type="text" id="maUrl" placeholder="https://bestof.tailXXXX.ts.net" style="width:100%"></label>
+          <label class="small muted">Dépôt GitHub <input type="text" id="maGit" placeholder="pseudo/depot" style="width:100%"></label>
+          <label class="small muted">Lien d'invitation Tailscale (un lien « réutilisable » sert pour tous ; à usage unique : change-le avant chaque ami)
+            <input type="text" id="maInv" placeholder="https://login.tailscale.com/admin/invite/…" style="width:100%"></label>
+          <div class="row"><button id="maSave">Enregistrer</button></div>
+        </div>
+      </details>
+    </div>
+  </div>
+</section>
+
 <section class="view" id="v-sources" hidden>
   <div class="panel">
     <h2>Sources et autorisations</h2>
@@ -436,7 +450,8 @@ function render(){
   $("#nNew").textContent = nNew;
   const tot = S.project.items.map(id => S.clips.find(c => c.id === id)).filter(Boolean).reduce((a,c)=>a+dur(c),0);
   $("#nBo").textContent = fmt(tot);
-  if (view === "collecte") { renderVods(); renderMachines(); renderJobs(); }
+  if (view === "collecte") { renderVods(); renderJobs(); }
+  if (view === "machines") renderMachines();
   if (vodOpen && $("#mTrim").hidden) renderVod();
   if (view === "bestof") renderBestof();
   if (view === "sources") renderSources();
@@ -551,7 +566,7 @@ const mBtn = (m, action, label) => `<button class="small" data-mc="${action}" da
 const fillIn = (el, v) => { v = v || ""; if (el.dataset.v !== v && document.activeElement !== el) el.value = el.dataset.v = v; };
 function renderMachines(){
   const M = S.machines || [], C = S.engine_conf || {}, now = Date.now() / 1000;
-  fillIn($("#maUrl"), C.public_url); fillIn($("#maGit"), C.github);
+  fillIn($("#maUrl"), C.public_url); fillIn($("#maGit"), C.github); fillIn($("#maInv"), C.invite);
   $("#maList").innerHTML = M.length ? M.map(m => `<div class="job">
     <div class="row"><b>${esc(m.name)}</b>${m.local ? `<span class="muted">· ce PC</span>` : ""}
       ${m.online ? `<span style="color:var(--ok)">● en ligne</span>`
@@ -564,35 +579,51 @@ function renderMachines(){
       <div class="muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(j.line)}">${esc(j.step || "démarrage")}${
         j.line ? " · " + esc(j.line) : ""}${j.started ? " · depuis " + fmt(now - j.started) : ""}</div></div>`).join("")}
     <div class="row" style="margin-top:6px">${m.paused ? mBtn(m, "resume", "Reprendre") : mBtn(m, "pause", "Arrêter après les fichiers en cours")}
-      ${!m.paused || m.jobs.length ? mBtn(m, "stop_now", "Arrêter maintenant") : ""}${m.local ? "" : mBtn(m, "remove", "Retirer")}</div>
+      ${!m.paused || m.jobs.length ? mBtn(m, "stop_now", "Arrêter maintenant") : ""}${m.local ? "" : `<button class="small" data-msg="${esc(m.name)}">Message</button>` + mBtn(m, "remove", "Retirer")}</div>
     </div>`).join("") : `<span class="muted">Aucune machine.</span>`;
   $$("[data-mc]").forEach(b => b.onclick = async () => {
     const name = b.dataset.mn, action = b.dataset.mc;
     if (ASK[action] && !confirm(ASK[action](name))) return;
     await api("/api/machines/control", {name, action}); refresh(); });
+  $$("[data-msg]").forEach(b => b.onclick = async () => showMsg(await api("/api/machines/message", {name:b.dataset.msg})));
+}
+function showMsg(r){  // le message complet pour l'ami, prêt à copier-coller
+  const msg = `Salut ! Voilà comment faire tourner le moteur d'analyse sur ton PC (une seule fois, environ 15 min) :
+
+1) Installe Tailscale : https://tailscale.com/download et connecte-toi (avec ton compte Google, c'est le plus simple).
+   ${r.invite ? "Ensuite ouvre ce lien et accepte l'invitation : " + r.invite : "Ensuite accepte l'invitation Tailscale que je t'envoie à part."}
+
+2) Installe le moteur :
+   - Windows : appuie sur la touche Windows, tape PowerShell, Entrée, colle cette ligne puis Entrée :
+     ${r.win}
+   - Mac : Cmd + Espace, tape Terminal, Entrée, colle cette ligne puis Entrée :
+     ${r.mac}
+   La première fois il télécharge environ 3 Go : laisse faire jusqu'à voir « Connecté à … ».
+
+3) Ensuite, pour le relancer : double-clic sur « Moteur Best-of » sur ton Bureau. Laisse la fenêtre ouverte (tu peux la réduire),
+   ferme-la pour l'arrêter. Il se met à jour tout seul. Évite juste que ton PC se mette en veille pendant que ça tourne.
+
+4) Pour trier les extraits avec moi : ${r.sort}`;
+  $("#maOut").innerHTML = `<div class="why" style="margin-top:10px"><b>Message pour « ${esc(r.name)} »</b>
+    <textarea id="maMsg" readonly rows="20" style="width:100%;margin-top:6px;font-size:13px"></textarea>
+    <div class="row" style="margin-top:6px"><button class="primary" id="maCopy">Copier le message</button>
+      <span class="small muted">Envoie-le en privé.</span></div></div>`;
+  $("#maMsg").value = msg;
+  $("#maCopy").onclick = async () => {
+    try { await navigator.clipboard.writeText(msg); toast("Message copié : colle-le dans ta conversation avec " + r.name); }
+    catch(e) { $("#maMsg").select(); toast("Message sélectionné : fais Ctrl+C"); }  // presse-papiers absent hors HTTPS
+  };
+  $("#maOut").scrollIntoView({block:"nearest"});
 }
 $("#maSave").onclick = async () => {
-  await api("/api/engine-settings", {public_url:$("#maUrl").value.trim(), github:$("#maGit").value.trim()});
+  await api("/api/engine-settings", {public_url:$("#maUrl").value.trim(), github:$("#maGit").value.trim(), invite:$("#maInv").value.trim()});
   toast("Réglages enregistrés"); refresh(); };
 $("#maNew").onkeydown = e => { if (e.key === "Enter") $("#maAdd").click(); };
 $("#maAdd").onclick = async () => {
-  const name = $("#maNew").value.trim(); if (!name) return toast("Donne un nom à la machine (ex. PC-Jean)");
+  const name = $("#maNew").value.trim(); if (!name) return toast("Tape le prénom de ton ami (ex. Jean)");
   const r = await api("/api/machines/add", {name});
-  const cmd = t => `<code class="cmd">${esc(t)}</code><button class="small" data-copy>Copier</button>`;
   $("#maNew").value = "";
-  $("#maOut").innerHTML = `<div class="why"><b>Machine « ${esc(r.name)} » créée.</b> Envoie ceci à ton ami :
-    <ol style="margin:6px 0 0;padding-left:20px">
-      <li>Installer Tailscale (<a href="https://tailscale.com/download" target="_blank" rel="noopener">tailscale.com/download</a>),
-        se connecter, puis accepter l'invitation ou le partage que tu lui envoies.</li>
-      <li><b>Windows</b> : appuyer sur la touche Windows, taper « PowerShell », Entrée, coller cette ligne, Entrée :${cmd(r.win)}
-        <b>Mac</b> : ouvrir « Terminal », coller cette ligne, Entrée :${cmd(r.mac)}</li>
-      <li>Ensuite, pour relancer le moteur : double-clic sur « Moteur Best-of » sur le Bureau.</li>
-    </ol></div>`;
-  $$("#maOut [data-copy]").forEach(b => b.onclick = async () => {
-    const c = b.previousElementSibling;
-    try { await navigator.clipboard.writeText(c.textContent); toast("Ligne copiée"); }
-    catch(e) { getSelection().selectAllChildren(c); toast("Ligne sélectionnée : fais Ctrl+C"); }  // presse-papiers absent hors HTTPS
-  });
+  showMsg(r);
   refresh();
 };
 

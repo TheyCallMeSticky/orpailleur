@@ -307,7 +307,7 @@ def running():
 
 
 def engine_conf():
-    return {"public_url": CONF.get("public_url", ""), "github": CONF.get("github", "")}
+    return {"public_url": CONF.get("public_url", ""), "github": CONF.get("github", ""), "invite": CONF.get("invite", "")}
 
 
 def machines_view():
@@ -341,8 +341,25 @@ def add_machine(name):
         tok = secrets.token_urlsafe(18)
         CONF["machines"][tok] = {"name": name, "created": store.now(), "local": False}
         save_conf()
+    return _message(name, tok)
+
+
+def _message(name, tok):
+    """Tout ce qu'il faut envoyer à un ami : ses lignes d'installation (avec la clé de sa machine), l'invitation Tailscale, le lien de tri."""
+    hub = CONF.get("public_url", "")
     return {"name": name, "token": tok, "win": f'irm "{hub}/moteur/install.ps1?m={tok}" | iex',
-            "mac": f'curl -fsSL "{hub}/moteur/install.sh?m={tok}" | bash'}
+            "mac": f'curl -fsSL "{hub}/moteur/install.sh?m={tok}" | bash', "sort": f"{hub}/?k={CONF['token']}",
+            "invite": CONF.get("invite", "")}
+
+
+def machine_message(name):
+    """Le message d'une machine déjà créée (perdu, ou à renvoyer)."""
+    tok = next((k for k, m in CONF.get("machines", {}).items() if m["name"] == name and not m.get("local")), None)
+    if not tok:
+        raise KeyError("machine introuvable")
+    if not CONF.get("public_url") or not CONF.get("github"):
+        raise ValueError("Renseigne d'abord l'adresse Tailscale du serveur et le dépôt GitHub.")
+    return _message(name, tok)
 
 
 def control(name, action):
@@ -380,8 +397,11 @@ def engine_settings(b):
         raise ValueError("Adresse invalide : elle commence par https:// (ex. https://bestof.tailXXXX.ts.net)")
     if repo and not re.fullmatch(r"[\w.-]+/[\w.-]+", repo):
         raise ValueError("Dépôt GitHub invalide : pseudo/depot")
+    invite = _s(b.get("invite", CONF.get("invite", "")), 300).strip()
+    if invite and not re.fullmatch(r"https://[\w.-]+/\S*", invite):
+        raise ValueError("Lien d'invitation invalide : il commence par https://login.tailscale.com/…")
     with store.lock:
-        CONF.update(public_url=url, github=repo)
+        CONF.update(public_url=url, github=repo, invite=invite)
         save_conf()
     return engine_conf()
 

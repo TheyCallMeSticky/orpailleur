@@ -63,7 +63,7 @@ Ce PC est le **serveur** (le site, la file, le tri, l'export, Claude avec ton co
 carte graphique) et renvoie seulement les passages candidats et leur transcription (environ 100 Ko). Une seule analyse à la fois
 par machine : 2 Whisper sur la même carte ne vont pas plus vite (mesuré : +24 % à 2, 0 % à 3).
 
-Dans **Collecte > Machines** : chaque machine, la VOD qu'elle traite et l'étape en cours. **Arrêter après les fichiers en cours**
+Dans l'onglet **Machines** : chaque machine, la VOD qu'elle traite et l'étape en cours. **Arrêter après les fichiers en cours**
 (elle finit puis ne prend plus rien), **Arrêter maintenant** (la VOD en cours repart en file pour une autre machine),
 **Reprendre**, **Retirer** (son accès est supprimé). Une machine éteinte ou déconnectée rend ses VODs au bout de 2 min.
 Quand ce PC est éteint, les moteurs attendent et reprennent seuls.
@@ -90,12 +90,13 @@ git remote add origin https://github.com/<pseudo>/bestof.git && git push -u orig
 ```
 Après chaque modification du code : `git add . && git commit -m "…" && git push` (sinon le site affiche « version différente »).
 
-### Ajouter la machine d'un ami
+### Inviter un ami
 
-Collecte > Machines > **Ajouter une machine** : renseigne une fois l'adresse Tailscale et le dépôt GitHub (`pseudo/bestof`), tape
-le nom de la machine, **Créer**. Envoie à ton ami la ligne affichée :
-- **Windows** : touche Windows, taper « PowerShell », Entrée, coller la ligne, Entrée.
-- **Mac** : ouvrir « Terminal », coller la ligne, Entrée.
+Onglet **Machines** > **Inviter un ami** : tape son prénom, **Créer le message**, **Copier le message**, et envoie-le-lui en privé.
+Le message contient tout : Tailscale et ton lien d'invitation, la ligne à coller sur Windows (PowerShell) ou Mac (Terminal), le
+lien pour trier. Un message par ami (il contient la clé de sa machine) ; **Message** sur une machine le réaffiche. Les réglages
+(adresse Tailscale, dépôt GitHub, lien d'invitation) se remplissent une fois dans **Réglages** ; un lien d'invitation Tailscale
+à usage unique est à changer avant chaque ami, un lien « réutilisable » sert pour tous (6 utilisateurs max en gratuit).
 
 Elle installe tout (dans `%LOCALAPPDATA%\BestOfMoteur` ou `~/.bestof-moteur`) et démarre le moteur. Ensuite : double-clic sur
 **Moteur Best-of** sur le Bureau ; il se met à jour tout seul depuis GitHub. Fermer la fenêtre arrête le moteur. Sans carte

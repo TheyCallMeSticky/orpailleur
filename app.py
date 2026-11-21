@@ -393,6 +393,8 @@ class H(BaseHTTPRequestHandler):
                 return self.send_json({"queued": analyze_vods([str(u) for u in self.body().get("urls", [])])})
             if method == "POST" and path == "/api/machines/add":
                 return self.send_json(engines.add_machine(self.body().get("name")))
+            if method == "POST" and path == "/api/machines/message":
+                return self.send_json(engines.machine_message(str(self.body().get("name"))))
             if method == "POST" and path == "/api/machines/control":
                 b = self.body()
                 return self.send_json(engines.control(str(b.get("name")), b.get("action")))
