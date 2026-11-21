@@ -52,6 +52,7 @@ def vod_rows(db):
         d[c["status"]] = d.get(c["status"], 0) + 1
     busy = {j.label: j.status for j in jobs.JOBS.values() if j.kind == "collect" and j.status in ("en attente", "en cours")}
     run, pend = engines.running(), set(db.get("pending", []))
+    scan_t = time.mktime(time.strptime(db["vods_scan"], "%Y-%m-%d %H:%M:%S")) if db.get("vods_scan") else time.time()
     out = []
     for v in (db.get("vods") or {}).values():
         if v.get("restricted") or v.get("recording") or v.get("excluded"):  # réservée aux abonnés, ou stream encore en direct : rien à analyser
@@ -73,6 +74,8 @@ def vod_rows(db):
         v["source_id"], v["counts"], v["clips"] = sid, n, sum(n.values())
         v.update(db.get("vod_fails", {}).get(v["url"], {}))  # fails, last_error
         v["analyses"] = src.get("analyses", [])
+        v["ended"] = round(scan_t - (v.get("age_h") or 0) * 3600)  # age_h : heures depuis la fin du stream, au moment du scan
+        v["day"] = store.day(v["ended"])
         out.append(v)
     return sorted(out, key=lambda v: v.get("age_h") or 0)
 
@@ -142,12 +145,16 @@ def _hourly():
         time.sleep(3600)
 
 
-def next_clips(user, skip, n=3):
+def next_clips(user, skip, day=None, n=3):
+    """day : "today" | "yesterday" | "older" (jour où l'extrait est arrivé) ; days = combien il en reste à trier par jour."""
     t = time.time()
     with store.lock:
         db = store.load()
         new = [c for c in db["clips"].values() if c["status"] == "new"]
-        free = [c for c in new if c["id"] not in skip
+        days = {"today": 0, "yesterday": 0, "older": 0}
+        for c in new:
+            days[store.day(c["added"])] += 1
+        free = [c for c in new if c["id"] not in skip and (day not in days or store.day(c["added"]) == day)
                 and not (c["id"] in LEASES and LEASES[c["id"]][0] != user and LEASES[c["id"]][1] > t)]
         free.sort(key=lambda c: (-(c.get("score") or 0), c["added"]))
         for k in [k for k, (u, _) in LEASES.items() if u == user]:
@@ -159,7 +166,21 @@ def next_clips(user, skip, n=3):
             c = dict(c)
             c["source"] = db["sources"].get(c["source_id"], {})
             out.append(c)
-        return {"clips": out, "remaining": len(new)}
+        return {"clips": out, "remaining": len(new), "days": days}
+
+
+def norm_segs(pieces, dur):
+    """Morceaux envoyés par le dashboard -> bornés au fichier, triés, fusionnés s'ils se chevauchent ou se touchent, sans miettes."""
+    if not isinstance(pieces, list) or not all(isinstance(p, (list, tuple)) and len(p) == 2
+                                                and all(isinstance(x, (int, float)) for x in p) for p in pieces):
+        raise ValueError("morceaux invalides")
+    out = []
+    for a, b in sorted((max(0.0, float(a)), min(float(dur), float(b))) for a, b in pieces):
+        if out and a <= out[-1][1]:
+            out[-1][1] = max(out[-1][1], b)
+        elif b > a:
+            out.append([a, b])
+    return [[round(a, 2), round(b, 2)] for a, b in out if b - a >= .3]
 
 
 def patch_clip(cid, body, user):
@@ -167,6 +188,17 @@ def patch_clip(cid, body, user):
         c = db["clips"].get(cid)
         if not c:
             raise KeyError("extrait introuvable")
+        pieces = None  # vérifiés avant toute modification : une erreur ne laisse rien à moitié changé
+        if "segs" in body:
+            pieces = norm_segs(body["segs"], c["file_dur"])
+        elif "in" in body or "out" in body:  # ancien réglage début/fin : rogne (ou allonge) les morceaux existants
+            a, b = body.get("in", c["in"]), body.get("out", c["out"])
+            if isinstance(a, (int, float)) and isinstance(b, (int, float)) and b - a >= .5:
+                pieces = [list(p) for p in store.segs(c) if p[1] > a and p[0] < b] or [[a, b]]
+                pieces[0][0], pieces[-1][1] = a, b
+                pieces = norm_segs(pieces, c["file_dur"])
+        if pieces == []:
+            raise ValueError("aucun morceau gardé")
         if "status" in body and body["status"] in ("new", "kept", "trash"):
             c["status"] = body["status"]
             if c["status"] == "new":
@@ -183,11 +215,12 @@ def patch_clip(cid, body, user):
             c["flags"] = {k: bool(v) for k, v in body["flags"].items() if k in store.FLAGS}
         if "note" in body:
             c["note"] = str(body["note"])[:500]
-        a, b = body.get("in", c["in"]), body.get("out", c["out"])
-        if isinstance(a, (int, float)) and isinstance(b, (int, float)):
-            a, b = max(0.0, float(a)), min(float(c["file_dur"]), float(b))
-            if b - a >= .5:
-                c["in"], c["out"] = round(a, 2), round(b, 2)
+        if pieces:
+            c["in"], c["out"] = pieces[0][0], pieces[-1][1]
+            if len(pieces) > 1:
+                c["segs"] = pieces
+            else:
+                c.pop("segs", None)
         LEASES.pop(cid, None)
         return c
 
@@ -230,6 +263,12 @@ def patch_source(sid, body):
         if body.get("auth") in store.AUTH:
             s["auth"] = body["auth"]
         return s
+
+
+def check_add(mode, window):
+    if mode not in (None, "whole", "auto"):
+        raise ValueError("mode inconnu")
+    collect.parse_window(window)
 
 
 class H(BaseHTTPRequestHandler):
@@ -317,6 +356,14 @@ class H(BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length") or 0)
         return json.loads(self.rfile.read(n) or b"{}") if n else {}
 
+    def add_video(self, label, inp, n, window, streamer, mode, audio=True):
+        """Vidéo ajoutée à la main (lien ou fichier) : mode "whole" (telle quelle dans le Tri) | "auto" (meilleurs moments) |
+        None (vidéo courte = whole, sinon auto). Passage et mode vérifiés ici : une erreur de saisie répond tout de suite."""
+        check_add(mode, window)
+        by = "" if self.user() == "?" else self.user()
+        return jobs.submit("collect", "collect", label, lambda j: collect.collect(j, inp, n, window, streamer, audio, mode=mode,
+                                                                                  by=by)).view()
+
     def engine_route(self, method, path, q):
         """Moteurs : jeton de machine (en-tête X-Machine, ou ?m= pour le script d'installation) à la place du cookie."""
         if method == "GET" and path in ("/moteur/install.ps1", "/moteur/install.sh"):
@@ -357,6 +404,12 @@ class H(BaseHTTPRequestHandler):
         try:
             if method == "GET" and path in ("/", "/index.html"):
                 return self.send_file(STATIC / "index.html")
+            if method == "GET" and path.startswith(("/static/", "/fonts/")):  # logo, icône, police des titres
+                base, _, name = path[1:].partition("/")
+                name = urllib.parse.unquote(name)
+                p = (STATIC if base == "static" else store.ROOT / "fonts") / name
+                ok = name and "/" not in name and ".." not in name and p.is_file()
+                return self.send_file(p) if ok else self.send_json({"error": "fichier introuvable"}, 404)
             if method == "GET" and path.startswith("/files/"):
                 rel = urllib.parse.unquote(path[len("/files/"):])
                 p = (store.DATA / rel).resolve()
@@ -366,7 +419,7 @@ class H(BaseHTTPRequestHandler):
                 return self.send_json(state())
             if method == "GET" and path == "/api/next":
                 skip = set(filter(None, q.get("skip", [""])[0].split(",")))
-                return self.send_json(next_clips(self.user(), skip))
+                return self.send_json(next_clips(self.user(), skip, q.get("day", [""])[0]))
             if method == "GET" and path.startswith("/api/job/"):
                 j = jobs.JOBS.get(path.rsplit("/", 1)[1])
                 return self.send_json(j.view(full=True) if j else {"error": "inconnu"}, 200 if j else 404)
@@ -383,9 +436,9 @@ class H(BaseHTTPRequestHandler):
                 if not inp:
                     return self.send_json({"error": "lien vide"}, 400)
                 n = max(1, min(50, int(b.get("max") or CONF["max_moments"] or 10)))
-                j = jobs.submit("collect", "collect", inp[:120], collect.collect, inp, n, str(b.get("window") or ""),
-                                str(b.get("streamer") or "").strip(), bool(b.get("audio", True)))
-                return self.send_json(j.view())
+                return self.send_json(self.add_video(inp[:120], inp, n, str(b.get("window") or ""),
+                                                     str(b.get("streamer") or "").strip(), b.get("mode") or None,
+                                                     bool(b.get("audio", True))))
             if method == "POST" and path == "/api/scan":
                 j = scan_now()
                 return self.send_json(j.view() if j else {"status": "déjà en cours"})
@@ -403,6 +456,7 @@ class H(BaseHTTPRequestHandler):
             if method == "POST" and path == "/api/follow":
                 return self.send_json(vods.save_settings(self.body()))
             if method == "POST" and path == "/api/upload":
+                check_add(q.get("mode", [None])[0], q.get("window", [""])[0])  # avant de recevoir le fichier
                 name = collect.safe_name(q.get("name", ["video.mp4"])[0])
                 dst = store.INBOX / f"{store.uid()}_{name}"
                 left = int(self.headers.get("Content-Length") or 0)
@@ -415,8 +469,7 @@ class H(BaseHTTPRequestHandler):
                         left -= len(chunk)
                 streamer = q.get("streamer", [""])[0]
                 n = max(1, min(50, int(q.get("max", [str(CONF["max_moments"])])[0] or 10)))
-                j = jobs.submit("collect", "collect", name, collect.collect, str(dst), n, q.get("window", [""])[0], streamer, True)
-                return self.send_json(j.view())
+                return self.send_json(self.add_video(name, str(dst), n, q.get("window", [""])[0], streamer, q.get("mode", [None])[0]))
             if method == "POST" and path.startswith("/api/clip/"):
                 return self.send_json(patch_clip(path.rsplit("/", 1)[1], self.body(), self.user()))
             if method == "POST" and path.startswith("/api/source/"):

@@ -1,4 +1,5 @@
 """Petite base JSON (data/db.json) protégée par un verrou : sources, extraits, best-of en cours, archives, exports."""
+import datetime
 import json
 import os
 import secrets
@@ -85,6 +86,18 @@ def config():
     return c
 
 
+def segs(c):
+    """Morceaux gardés d'un extrait, en secondes dans son fichier : [[début, fin], ...] (un seul sans coupe)."""
+    return c.get("segs") or [[c["in"], c["out"]]]
+
+
 def cdur(c):
-    """Durée utile d'un extrait (après réglage début/fin)."""
-    return max(0.0, float(c["out"]) - float(c["in"]))
+    """Durée utile d'un extrait : la somme de ses morceaux (après réglage et coupes)."""
+    return sum(max(0.0, float(b) - float(a)) for a, b in segs(c))
+
+
+def day(t):
+    """Jour (heure locale) de t, en secondes ou au format de now() : "today" | "yesterday" | "older"."""
+    d = datetime.date.fromisoformat(t[:10]) if isinstance(t, str) else datetime.date.fromtimestamp(t)
+    n = (datetime.date.today() - d).days
+    return "today" if n <= 0 else "yesterday" if n == 1 else "older"

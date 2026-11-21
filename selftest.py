@@ -2,8 +2,10 @@
 import json
 import os
 import tempfile
+from pathlib import Path
 
-os.environ["BESTOF_DATA"] = tempfile.mkdtemp()  # ne touche jamais aux vraies données
+# ne touche jamais aux vraies données ; pas dans /tmp (petit disque en mémoire)
+os.environ["BESTOF_DATA"] = tempfile.mkdtemp(prefix="orpailleur-selftest-", dir=Path.home() / ".cache")
 
 import ai  # noqa: E402
 import collect  # noqa: E402
@@ -161,4 +163,88 @@ moteur.child(jf)
 collect.detect_vod = _dv
 o = json.load(open(jf[:-5] + ".out.json", encoding="utf-8"))
 assert (o["ok"], o["code"], o["error"]) == (False, "restricted", "abonnés") and "Écartée" in o["log"], o
+
+# coupes : morceaux bornés au fichier, triés, fusionnés s'ils se chevauchent ou se touchent, miettes retirées ; 1 morceau = in/out
+import time  # noqa: E402
+import app  # noqa: E402
+with store.tx() as db:
+    db["sources"]["sc"] = {"id": "sc", "url": "u-cut", "streamer": "Geo", "streamer_url": "https://www.twitch.tv/geo"}
+    db["clips"]["cut"] = {"id": "cut", "source_id": "sc", "status": "new", "in": 2.0, "out": 20.0, "file_dur": 30.0, "added": store.now()}
+c = app.patch_clip("cut", {"segs": [[20, 40], [5, 10], [8, 12], [-3, 1], [15, 15.2]]}, "u")
+assert c["segs"] == [[0, 1], [5, 12], [20, 30]] and (c["in"], c["out"]) == (0, 30) and store.cdur(c) == 18, c
+c = app.patch_clip("cut", {"in": 6, "out": 25}, "u")  # ancien réglage début/fin : rogne les morceaux
+assert c["segs"] == [[6, 12], [20, 25]] and store.cdur(c) == 11, c
+c = app.patch_clip("cut", {"segs": [[0, 5], [5, 8]]}, "u")
+assert "segs" not in c and (c["in"], c["out"]) == (0, 8) and store.cdur(c) == 8, c
+for bad in ([], [[3, 3.1]], [["a", 2]], "x"):
+    try:
+        app.patch_clip("cut", {"segs": bad, "status": "trash"}, "u")
+        raise AssertionError(f"morceaux acceptés : {bad}")
+    except ValueError:
+        assert store.load()["clips"]["cut"]["status"] == "new"  # rien n'a changé
+
+# jour d'arrivée (heure locale) : extraits à trier et VODs rangés en aujourd'hui / hier / plus ancien
+import datetime  # noqa: E402
+yday = datetime.datetime.combine(datetime.date.today() - datetime.timedelta(days=1), datetime.time(12)).timestamp()
+assert (store.day(time.time()), store.day(yday), store.day(yday - 3 * 86400)) == ("today", "yesterday", "older")
+assert store.day(store.now()) == "today" and store.day(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(yday))) == "yesterday"
+with store.tx() as db:
+    for k, cl in enumerate(db["clips"].values()):
+        cl["added"] = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(yday if k == 0 else time.time()))
+    first = next(iter(db["clips"]))
+    nxt = app.next_clips("u", set(), "yesterday")
+    tot = sum(cl["status"] == "new" for cl in db["clips"].values())
+assert [x["id"] for x in nxt["clips"]] == [first] and nxt["days"] == {"today": tot - 1, "yesterday": 1, "older": 0}, nxt
+assert len(app.next_clips("u", set())["clips"]) == min(3, tot) and app.next_clips("u", set(), "older")["clips"] == []
+with store.tx() as db:
+    db["vods"], db["vods_scan"] = {"v": {"url": "v", "title": "t", "age_h": 2}}, store.now()
+row = app.vod_rows(store.load())[0]
+assert abs(row["ended"] - (time.time() - 7200)) < 5 and row["day"] == store.day(row["ended"]), row
+
+# export d'un extrait coupé en 2 morceaux (avec son, puis sans son) : un seul segment de la durée totale des morceaux
+av = store.TMP / "av.mp4"
+subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=30", "-f", "lavfi", "-i",
+                "sine=frequency=440:sample_rate=48000", "-t", "30", "-shortest", "-c:a", "aac", str(av)], check=True)
+shutil.copy(av, store.CLIPS / "av.mp4")
+shutil.copy(vid, store.CLIPS / "mute.mp4")
+with store.tx() as db:
+    for cid in ("av", "mute"):
+        db["clips"][cid] = {"id": cid, "source_id": "sc", "status": "kept", "file": f"media/clips/{cid}.mp4", "src_start": 0,
+                            "in": 0, "out": 30, "file_dur": 30.0, "fps": 30, "rating": 4, "category": "FUN", "flags": {}}
+    db["project"]["items"] = ["av", "mute"]
+app.patch_clip("av", {"segs": [[2, 5], [10, 14]]}, "u")
+app.patch_clip("mute", {"segs": [[1, 3], [20, 23.5]]}, "u")
+rec = montage.export(jobs.Job("export", "test", None, ()))
+seg = sorted((store.DATA / rec["dir"] / "segments").glob("*.mp4"))
+assert [abs(collect.probe(f)["dur"] - d) < .2 for f, d in zip(seg, (7, 5.5))] == [True, True], [collect.probe(f) for f in seg]
+assert all(collect.probe(f)["audio"] for f in seg) and abs(rec["dur"] - 12.5) < .3, rec
+
+# ajout à la main « tel quel dans le Tri » (fichier local) : un passage = un extrait en tête du Tri ; > 30 min refusé
+long = store.TMP / "long.mp4"
+subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "color=c=red:size=64x36:rate=1", "-t", "1900", str(long)], check=True)
+jw = jobs.Job("collect", "test", None, ())
+try:
+    collect.collect(jw, str(long), mode="whole", by="Azer")
+    raise AssertionError("vidéo de 31 min acceptée en entier")
+except RuntimeError as e:
+    assert "Trop long" in str(e)
+try:
+    collect.parse_window("2:00-1:00")
+    raise AssertionError("passage à l'envers accepté")
+except ValueError:
+    pass
+assert collect.collect(jw, str(long), 10, "1:00-1:20", "Peanut", mode="whole", by="Azer") == 1
+c = max(store.load()["clips"].values(), key=lambda c: c.get("added") or "")
+src = store.load()["sources"][c["source_id"]]
+assert (c["score"], c["why"], c["src_start"], src["added_by"], src["streamer"]) == (50, "ajouté par Azer", 60, "Azer", "Peanut"), c
+assert abs(store.cdur(c) - 20) < 1.5, c
+assert app.next_clips("v", set())["clips"][0]["id"] == c["id"]  # en tête du Tri
+try:
+    collect.collect(jw, str(long), 10, "1:10-1:30", "Peanut", mode="whole", by="Azer")
+    raise AssertionError("passage déjà ajouté accepté")
+except RuntimeError as e:
+    assert "Déjà ajoutée" in str(e)
+assert collect.streamer_of({"channel": "xQc"}, "https://clips.twitch.tv/AwkwardHelplessSalamander")[1] == "https://www.twitch.tv/xqc"
+
+shutil.rmtree(store.DATA, ignore_errors=True)
 print("selftest ok")

@@ -3,250 +3,392 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Best-of GTA 6</title>
+<title>Orpailleur</title>
+<link rel="icon" href="/static/favicon.png">
 <style>
+@font-face{font-family:Poppins;src:url(/fonts/Poppins-Bold.ttf) format("truetype");font-weight:700;font-style:normal;font-display:swap}
+/* couleurs du logo « Leonida Gone Wild » : nuit violette, rose néon, menthe, dégradé orange → jaune, crème */
 :root{
-  --bg:#0e0f13;--panel:#171920;--panel2:#1f222b;--line:#2b2f3a;--text:#e9eaee;--muted:#9097a6;--accent:#ff4fa3;
-  --WTF:#a970ff;--FUN:#ffd23f;--FAIL:#ff5252;--EPIC:#29d3f5;--ok:#3ddc84;--warn:#ffb020;
+  --bg:#12011b;--top:#180224;--panel:#1d0a2b;--panel2:#281138;--panel3:#341a49;--field:#13021d;
+  --line:#3a1f52;--line2:#5a3580;--text:#fdfef9;--muted:#bba8cb;--dim:#9581a8;
+  --accent:#fd1fb0;--accent2:#ff66c9;--mint:#3ef0b4;--orange:#fd7a67;--yellow:#ffc83c;--ink:#1a0424;
+  --grad:linear-gradient(100deg,#fd7a67,#ffc83c);--neon:linear-gradient(90deg,#fd1fb0,#fd7a67,#ffc83c);
+  --WTF:#b383ff;--FUN:#ffd23f;--FAIL:#ff4d5e;--EPIC:#2fd6f6;
+  --ok:#3ef0b4;--warn:#ffc83c;--err:#ff5c7a;
+  --piece:#fd1fb059;--gap:#0a0010;
+  --head:Poppins,system-ui,-apple-system,"Segoe UI",sans-serif;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+html{scrollbar-color:var(--line2) var(--bg)}
+body{margin:0;min-height:100vh;color:var(--text);font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  background:radial-gradient(1000px 460px at 0 0,#2c0742,transparent 70%) no-repeat,var(--bg)}
+h1,h2,h3{font-family:var(--head);font-weight:700;letter-spacing:.2px;line-height:1.25}
+h2{font-size:18px;margin:0 0 12px}
+h3{font-size:16px;margin:18px 0 8px}
 button,input,select,textarea{font:inherit;color:inherit}
-button{cursor:pointer;border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:7px 12px}
-button:hover{border-color:#4a5060}
-button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button{cursor:pointer;border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:8px 14px;font-weight:500;
+  transition:background-color .12s,border-color .12s,filter .12s}
+button:where(:hover:not(:disabled)){border-color:var(--line2);background:var(--panel3)}
+button:active:not(:disabled){transform:translateY(1px)}
+button.primary{background:var(--grad);border-color:transparent;color:var(--ink);font-weight:700}
+button.primary:hover:not(:disabled){filter:brightness(1.08)}
 button.ghost{background:transparent}
-button:disabled{opacity:.45;cursor:default}
-input,select,textarea{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
-input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
-a{color:#7cc4ff}
-header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:6px;padding:10px 16px;background:#0e0f13ee;
-  backdrop-filter:blur(6px);border-bottom:1px solid var(--line);flex-wrap:wrap}
-header h1{font-size:16px;margin:0 14px 0 0;letter-spacing:.3px}
-header h1 b{color:var(--accent)}
-nav{display:flex;gap:4px;flex-wrap:wrap}
-nav button{background:transparent;border-color:transparent}
-nav button.on{background:var(--panel2);border-color:var(--line)}
-.badge{display:inline-block;min-width:20px;padding:0 6px;border-radius:10px;background:var(--accent);color:#fff;font-size:12px;text-align:center;margin-left:4px}
-.me{margin-left:auto;color:var(--muted)}
-main{padding:16px;max-width:1500px;margin:0 auto}
-.view[hidden]{display:none}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+button.small{padding:4px 10px;font-size:12.5px;border-radius:8px}
+button:disabled{opacity:.4;cursor:default}
+button.primary:disabled{background:var(--panel3);color:var(--muted)}
+:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
+input,select,textarea{background:var(--field);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+input::placeholder,textarea::placeholder{color:var(--dim)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #fd1fb033}
+input[type=checkbox],input[type=range]{accent-color:var(--accent);box-shadow:none}
+input[type=checkbox]{width:16px;height:16px;margin:0;vertical-align:-3px;cursor:pointer}
+input[type=range]{padding:0;border:0;background:none;cursor:pointer}
+input[type=file]{padding:5px;max-width:100%;color:var(--muted)}
+input[type=file]::file-selector-button{font:inherit;font-weight:600;color:var(--text);background:var(--panel3);border:1px solid var(--line2);
+  border-radius:8px;padding:6px 12px;margin-right:10px;cursor:pointer}
+a{color:var(--mint);text-decoration:none}
+a:hover{text-decoration:underline}
+label{cursor:default}
+
+/* en-tête */
+header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:8px 20px;padding:10px 24px;background:#180224f5;
+  border-bottom:1px solid var(--line);flex-wrap:wrap}
+header::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--neon);opacity:.9}
+.logo img{height:48px;width:48px;display:block;border-radius:12px}
+nav{display:flex;gap:4px}
+nav button{background:transparent;border-color:transparent;color:var(--muted);font:700 14.5px var(--head);padding:9px 14px;border-radius:12px;white-space:nowrap}
+nav button:hover:not(:disabled){background:var(--panel2);color:var(--text)}
+nav button.on{background:#fd1fb021;border-color:#fd1fb080;color:var(--text)}
+.badge{display:inline-block;min-width:22px;padding:1px 7px;border-radius:999px;background:var(--accent);color:var(--ink);
+  font:800 12px/1.45 system-ui,sans-serif;text-align:center;margin-left:6px;vertical-align:1px}
+.badge.dim{background:var(--panel3);color:var(--muted);font-weight:700}
+.me{margin-left:auto;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:5px 14px}
+.me a{color:var(--text);font-weight:700}
+
+main{padding:24px;max-width:1480px;margin:0 auto}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:0 14px 34px #07000d66}
+.view>.panel+.panel,.stack>*+*{margin-top:20px}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.between{justify-content:space-between}
+.grow{flex:1}
 .muted{color:var(--muted)}
-.small{font-size:12px}
-h2{font-size:15px;margin:0 0 10px}
-.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+.small{font-size:12.5px}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.err{color:var(--err)}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
 @media (max-width:900px){.grid2{grid-template-columns:1fr}}
-.cat{display:inline-block;padding:1px 7px;border-radius:6px;font-weight:700;font-size:12px;color:#111}
+.cat{display:inline-block;padding:1px 8px;border-radius:6px;font:700 11.5px/1.6 var(--head);letter-spacing:.4px;color:var(--ink)}
 .cat.WTF{background:var(--WTF)}.cat.FUN{background:var(--FUN)}.cat.FAIL{background:var(--FAIL)}.cat.EPIC{background:var(--EPIC)}
 .stars{color:var(--FUN);letter-spacing:1px;white-space:nowrap}
-.stars.edit span{cursor:pointer;color:#444b58}.stars.edit span.on{color:var(--FUN)}
-kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px;font-size:11px;color:var(--muted);font-family:inherit}
+.stars.edit span{cursor:pointer;color:#5b4470;font-size:24px}.stars.edit span.on{color:var(--FUN)}
+kbd{border:1px solid var(--line2);border-bottom-width:2px;border-radius:5px;padding:0 5px;font-size:11px;color:var(--muted);
+  font-family:inherit;background:#ffffff08}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border-radius:999px;padding:6px 15px;background:transparent;border-color:var(--line2);color:var(--muted);font-weight:600}
+.chip:hover:not(:disabled){color:var(--text)}
+.chip.on{background:#fd1fb026;border-color:var(--accent);color:var(--text)}
+.chip .n{margin-left:4px;font-weight:800;color:var(--accent2)}
+.empty{padding:52px 20px;text-align:center;color:var(--muted)}
+.why{background:var(--panel2);border-radius:12px;padding:10px 12px;margin:10px 0;font-size:13px}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--panel3);border:1px solid var(--line2);
+  border-left:4px solid var(--accent);padding:10px 16px;border-radius:12px;z-index:30;max-width:calc(100% - 32px);
+  box-shadow:0 14px 34px #000b;font-weight:500}
 
-/* Collecte */
-.form{display:grid;grid-template-columns:1fr;gap:8px}
-.form .row input[type=text]{flex:1;min-width:200px}
-.job{border-top:1px solid var(--line);padding:8px 0}
-.job pre{margin:6px 0 0;white-space:pre-wrap;font:12px/1.4 ui-monospace,Consolas,monospace;color:var(--muted);max-height:260px;overflow:auto}
-.st{font-size:12px;padding:1px 7px;border-radius:6px;background:var(--panel2)}
-.st.erreur{background:#5a1d1d}.st.terminé{background:#163d27}.st.en\ cours{background:#4a3a10}
-.cmd{display:block;margin:4px 0;padding:6px 8px;background:var(--bg);border-radius:6px;font:12px/1.4 ui-monospace,Consolas,monospace;
-  white-space:pre-wrap;word-break:break-all;user-select:all}
-
-/* Tri */
-#tri{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px}
-@media (max-width:1000px){#tri{grid-template-columns:1fr}}
-.player{position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:16/9;max-width:100%}
-.player video{width:100%;height:100%;display:block;background:#000}
-.bar{position:relative;height:8px;background:var(--panel2);border-radius:4px;margin-top:8px;cursor:pointer}
-.bar .win{position:absolute;top:0;bottom:0;background:#ff4fa355;border-left:2px solid var(--accent);border-right:2px solid var(--accent)}
-.bar .pos{position:absolute;top:-3px;bottom:-3px;width:2px;background:#fff}
-.cats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
-.cats button{padding:16px 6px;font-size:18px;font-weight:800;border-width:2px;color:var(--text)}
-.cats button small{display:block;font-size:11px;font-weight:400;color:var(--muted)}
-.cats button.on{color:#111}
-.cats button[data-c=WTF].on{background:var(--WTF);border-color:var(--WTF)}
-.cats button[data-c=FUN].on{background:var(--FUN);border-color:var(--FUN)}
-.cats button[data-c=FAIL].on{background:var(--FAIL);border-color:var(--FAIL)}
-.cats button[data-c=EPIC].on{background:var(--EPIC);border-color:var(--EPIC)}
-.cats button[data-c=WTF]{border-color:var(--WTF)}.cats button[data-c=FUN]{border-color:var(--FUN)}
-.cats button[data-c=FAIL]{border-color:var(--FAIL)}.cats button[data-c=EPIC]{border-color:var(--EPIC)}
-.rate{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:10px}
-.rate button{font-size:22px;padding:8px 0;color:#555c6a}
-.rate button.on{color:var(--FUN);border-color:var(--FUN)}
-.rate.wait button{opacity:.4}
-.side .flag{display:flex;gap:8px;align-items:center;padding:6px 0}
-.why{background:var(--panel2);border-radius:8px;padding:8px 10px;margin:8px 0;font-size:13px}
-.empty{padding:60px 20px;text-align:center;color:var(--muted)}
-.keys{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:12px;color:var(--muted)}
-
-/* Best-of */
-#bo{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:16px}
-@media (max-width:1000px){#bo{grid-template-columns:1fr}}
-.list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
-.item{display:grid;grid-template-columns:auto 96px minmax(0,1fr) auto;gap:10px;align-items:center;background:var(--panel2);
-  border:1px solid var(--line);border-radius:10px;padding:6px 8px}
-.item img{width:96px;aspect-ratio:16/9;object-fit:cover;border-radius:6px;background:#000;cursor:pointer}
+/* listes (vidéos, extraits) */
+.list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.item{display:grid;grid-template-columns:auto 104px minmax(0,1fr) auto;gap:12px;align-items:center;background:var(--panel2);
+  border:1px solid transparent;border-radius:12px;padding:8px 10px;transition:border-color .12s,background-color .12s}
+.item:hover{border-color:var(--line2);background:var(--panel3)}
+.item img,.nothumb{width:104px;aspect-ratio:16/9;object-fit:cover;border-radius:8px;background:var(--gap);display:block}
+.item [data-open],.item [data-play]{cursor:pointer}
 .item .t{min-width:0}
-.item .t div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.item .acts{display:flex;gap:4px}
-.item .acts button{padding:4px 8px}
+.item .t>div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .t>div+div{margin-top:2px}
+.item .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.item .acts button{padding:5px 11px}
+.item .acts:empty{display:none}
+.item [data-add]{width:36px;height:36px;padding:0;border-radius:50%;font-size:18px;font-weight:700;color:var(--ink);background:var(--mint);border-color:var(--mint)}
+.item [data-add]:hover{filter:brightness(1.1)}
+.item [data-rm]:hover{border-color:var(--err);color:var(--err)}
 .item.drag{opacity:.4}
 .item.over{border-color:var(--accent)}
-.handle{cursor:grab;color:var(--muted);padding:0 4px;user-select:none}
-.num{color:var(--muted);font-variant-numeric:tabular-nums;width:22px;text-align:right}
-.gauge{height:10px;background:var(--panel2);border-radius:5px;overflow:hidden;margin:8px 0}
-.gauge div{height:100%;background:var(--ok)}
-.gauge.over div{background:var(--warn)}
-.warns{margin:8px 0;padding:0;list-style:none}
-.warns li{background:#3a2a0a;border:1px solid #6b4c10;border-radius:8px;padding:6px 10px;margin-bottom:6px;font-size:13px}
-.total{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+.handle{cursor:grab;color:var(--dim);padding:0 4px;user-select:none}
+.num{color:var(--muted);font:700 13px var(--head);font-variant-numeric:tabular-nums;width:22px;text-align:right}
 
-/* Modale */
-.modal{position:fixed;inset:0;background:#000b;z-index:20;display:flex;align-items:center;justify-content:center;padding:16px}
-.modal .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;width:min(980px,100%);max-height:100%;overflow:auto}
+/* Vidéos */
+.add h2{font-size:20px}
+.add .link{flex:1;min-width:220px;font-size:15px;padding:12px 14px}
+.add .opt{gap:10px 20px;margin-top:12px}
+.add .opt label{display:inline-flex;align-items:center;gap:8px}
+.add .choices{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+@media (max-width:600px){.add .choices{grid-template-columns:1fr}}
+.add .choices button{padding:16px 20px;font:700 17px var(--head);text-align:left;border-radius:14px}
+.add .choices button:not(.primary){border-color:var(--line2)}
+.add .choices button:not(.primary):hover{border-color:var(--mint)}
+.add .choices small{display:block;font:400 13px/1.4 system-ui,sans-serif;opacity:.85;margin-top:3px}
+.add .time{width:92px}
+.vrow{grid-template-columns:112px minmax(0,1fr) auto auto;padding:6px 10px}
+.vrow img,.vrow .nothumb{width:112px}
+.vclip{grid-template-columns:104px minmax(0,1fr) auto}
+#lib .item{grid-template-columns:104px minmax(0,1fr) auto}
+#lib .item>span:empty{display:none}
+.vrow .t a{color:var(--text)}
+.vrow .t b{font-size:15px}
+.state{font-size:12.5px;white-space:nowrap;text-align:right}
+.state>span{display:inline-block;max-width:320px;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;padding:3px 11px;
+  border-radius:999px;background:var(--panel3);color:var(--text);font-weight:600}
+.state>.ok{background:#3ef0b41f;color:var(--ok)}
+.state>.warn{background:#ffc83c1c;color:var(--warn)}
+.state>.run{background:#fd1fb026;color:var(--accent2)}
+.state>.err{background:#ff5c7a21;color:var(--err)}
+.dgroup{margin-top:20px}
+.dgroup+.dgroup{border-top:1px solid var(--line);padding-top:4px}
+.dgroup h3{font-size:18px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.dgroup h3 .muted{font:400 13px system-ui,sans-serif}
+.sub{font-size:11.5px;font-weight:700;color:var(--dim);margin:14px 0 0;text-transform:uppercase;letter-spacing:.9px}
+
+/* lecteur / éditeur partagé (Tri, réglage d'un extrait) */
+.player{position:relative;background:#000;border-radius:14px;overflow:hidden;aspect-ratio:16/9;width:100%;border:1px solid var(--line)}
+.player video{width:100%;height:100%;display:block;background:#000}
+#mEd .player{max-height:max(200px,calc(100vh - 440px))}
+.pbar{position:relative;height:30px;background:var(--gap);border:1px solid var(--line);border-radius:9px;margin-top:10px;cursor:pointer;touch-action:none}
+.pbar .pc{position:absolute;top:3px;bottom:3px;background:var(--piece);border-radius:6px;box-shadow:inset 0 0 0 1px #fd1fb0aa}
+.pbar .pc.on{background:var(--accent);box-shadow:0 0 14px #fd1fb070}
+.pbar .h{position:absolute;top:-5px;bottom:-5px;left:-4px;width:8px;background:#fff;border-radius:4px;box-shadow:0 0 0 2px var(--ink)}
+.pbar .h.r{left:auto;right:-4px}
+.pbar .ph{position:absolute;top:-6px;bottom:-6px;width:3px;margin-left:-1.5px;background:#fff;border-radius:2px;pointer-events:none;z-index:2;
+  box-shadow:0 0 8px #fffa}
+.ectl{margin-top:10px}
+.ectl [data-a=play],#pvPlay{min-width:48px;font-size:16px;background:var(--accent);border-color:var(--accent);color:var(--ink)}
+.ectl [data-a=play]:hover,#pvPlay:hover{filter:brightness(1.1)}
+.etime{font-variant-numeric:tabular-nums;color:var(--muted);margin-left:6px}
+.etime b{color:var(--text)}
+.vol{width:120px}
+.volv{width:42px;text-align:right}
+.ecut{margin-top:14px}
+.ecut [data-a=cut]{border-color:var(--accent);color:var(--accent2);font-weight:600}
+.ecut [data-a=cut]:hover{background:#fd1fb01f}
+.ecut [data-a=del]:hover{border-color:var(--err);color:var(--err)}
+.enudge{margin-top:10px;justify-content:space-between;background:var(--field);border:1px solid var(--line);border-radius:12px;padding:8px 12px}
+.enudge button{padding:5px 10px}
+.enudge b{display:inline-block;width:60px;text-align:center;font-variant-numeric:tabular-nums}
+
+/* Tri : la vidéo et ses outils à gauche, la décision (catégorie, note) à droite, toujours visible */
+#tDays{margin-bottom:16px}
+.trigrid{display:grid;grid-template-columns:minmax(0,1fr) 350px;gap:20px;align-items:start}
+@media (max-width:1100px){.trigrid{grid-template-columns:1fr}}
+#tEd .player{max-height:max(240px,calc(100vh - 360px))}
+#tTools .ecut{margin-top:12px}
+.side #tmeta>h2{font-size:22px;margin-bottom:2px}
+.side #tmeta.empty{padding:24px 8px}
+.side h2{font-size:15px;margin:22px 0 6px}
+.cats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.cats button{padding:12px 8px;font:700 21px var(--head);letter-spacing:.5px;border-width:2px;border-radius:14px;color:var(--text)}
+.cats button small{display:block;font:400 12px/1.35 system-ui,sans-serif;letter-spacing:0;color:var(--muted);margin-top:2px}
+.cats button:hover:not(:disabled){filter:brightness(1.25)}
+.cats button[data-c=WTF]{border-color:var(--WTF);background:#b383ff17}.cats button[data-c=FUN]{border-color:var(--FUN);background:#ffd23f12}
+.cats button[data-c=FAIL]{border-color:var(--FAIL);background:#ff4d5e14}.cats button[data-c=EPIC]{border-color:var(--EPIC);background:#2fd6f612}
+.cats button.on,.cats button.on small{color:var(--ink)}
+.cats button[data-c=WTF].on{background:var(--WTF)}.cats button[data-c=FUN].on{background:var(--FUN)}
+.cats button[data-c=FAIL].on{background:var(--FAIL)}.cats button[data-c=EPIC].on{background:var(--EPIC)}
+/* note : 5 étoiles, celles jusqu'à la note (ou jusqu'au pointeur) s'allument */
+.rate{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:10px}
+.rate button{font-size:26px;line-height:1;padding:6px 0 4px;color:#6b5482;background:var(--field);border-radius:12px}
+.rate button small{display:block;font-size:11px;color:var(--dim);margin-top:2px}
+.rate button.on,.rate:not(.wait) button:hover,.rate:not(.wait) button:has(~ button:hover){color:var(--FUN);border-color:#ffd23f99;background:#ffd23f14}
+.rate.wait button{opacity:.45}
+.tacts{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
+.tacts button{padding:8px 4px;font-size:13px}
+#tTrash:hover{border-color:var(--err);color:var(--err)}
+.side .flag{display:flex;gap:10px;align-items:center;padding:5px 0;cursor:pointer}
+.side .flag kbd{margin-left:auto}
+.suggest{background:#fd1fb012;border:1px solid #fd1fb066}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:12px;color:var(--muted)}
+
+/* Best-of */
+#bo{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:20px;align-items:start}
+@media (max-width:1000px){#bo{grid-template-columns:1fr}}
+#pName{font:700 21px var(--head);background:transparent;border-color:transparent;padding:6px 10px;margin-left:-10px}
+#pName:hover{border-color:var(--line)}
+#pName:focus{background:var(--field);border-color:var(--accent)}
+.gauge{height:10px;background:var(--field);border:1px solid var(--line);border-radius:999px;overflow:hidden;margin:10px 0 14px}
+.gauge div{height:100%;background:var(--neon);border-radius:999px}
+.gauge.over div{background:var(--err)}
+.pvbar{cursor:pointer;height:12px;margin:12px 0}
+.warns{margin:8px 0;padding:0;list-style:none}
+.warns li{background:#ffc83c14;border:1px solid #ffc83c55;border-radius:10px;padding:7px 12px;margin-bottom:6px;font-size:13px}
+.total{font:700 34px/1.1 var(--head);font-variant-numeric:tabular-nums;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.credit{position:absolute;left:2%;top:3.5%;background:#0008;color:#fff;font:700 clamp(10px,1.8vw,18px) var(--head);padding:.3em .6em}
+details.opts summary{cursor:pointer;width:max-content}
+.exps-title{margin-top:26px;padding-top:18px;border-top:1px solid var(--line)}
+#exps .row a{padding:4px 11px;border:1px solid var(--line2);border-radius:999px;color:var(--text);font-size:12.5px}
+#exps .row a:hover{border-color:var(--mint);color:var(--mint);text-decoration:none}
+#pNew{color:var(--muted)}
+
+/* Machines */
+.job{border-top:1px solid var(--line);padding:12px 0}
+.job:first-child{border-top:0;padding-top:4px}
+.job pre{margin:8px 0 0;white-space:pre-wrap;font:12px/1.45 ui-monospace,Consolas,monospace;color:var(--muted);max-height:260px;overflow:auto;
+  background:var(--field);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.st{font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;background:var(--panel3)}
+.st.erreur{background:#ff5c7a2b;color:var(--err)}.st.terminé{background:#3ef0b422;color:var(--ok)}.st.en\ cours{background:#ffc83c22;color:var(--warn)}
+.form{display:grid;grid-template-columns:1fr;gap:12px}
+.form>label{display:flex;flex-direction:column;gap:5px}
+.form>label.inl{flex-direction:row;align-items:center;gap:10px}
+
+/* Streamers */
+.follow{gap:8px}
+.follow label{padding:6px 12px;display:inline-flex;gap:8px;align-items:center;background:var(--panel2);border:1px solid var(--line);
+  border-radius:999px;font-weight:600}
+.follow label .muted{font-weight:400;font-size:12px}
+.follow label:has(input:not(:checked)){opacity:.5}
+.follow a{color:var(--dim);padding:0 2px}
+.follow a:hover{color:var(--err);text-decoration:none}
 table{width:100%;border-collapse:collapse}
-td,th{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
-th{color:var(--muted);font-weight:500;font-size:12px}
+td,th{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:#ffffff06}
+th{color:var(--dim);font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.7px}
+#srcT td:nth-child(2) a{color:var(--text)}
+#srcT td:nth-child(2) .muted{margin-top:2px}
+#srcT td:last-child{font:700 15px var(--head);text-align:center}
+#srcT th:last-child{text-align:center}
 .tablewrap{overflow-x:auto}
-#mTrim{z-index:25}  /* au-dessus de la liste des extraits d'une VOD */
-@keyframes flash{0%,100%{background:var(--panel2)}25%,75%{background:var(--accent);color:#fff}}
+@keyframes flash{0%,100%{background:var(--panel2)}25%,75%{background:var(--accent);color:var(--ink)}}
 .flash{animation:flash 1.6s ease-in-out 2;outline:2px solid var(--accent)}
-.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);
-  padding:8px 14px;border-radius:10px;z-index:30}
+
+/* fenêtres */
+.modal{position:fixed;inset:0;background:#0a0010d9;z-index:20;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal .box{background:var(--panel);border:1px solid var(--line2);border-radius:20px;padding:20px;width:min(1000px,100%);max-height:100%;overflow:auto;
+  box-shadow:0 30px 80px #000c}
+.modal .box>h2,.modal .box .head h2{margin:0;min-width:0}
+.modal .head{flex-wrap:nowrap}
+.modal .head h2{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msave{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+#mTrim{z-index:25}  /* au-dessus de la liste des extraits d'une VOD */
+
+/* téléphone */
+@media (max-width:640px){
+  header{padding:8px 12px;gap:8px 12px}
+  .logo img{height:40px;width:40px;border-radius:10px}
+  nav{order:3;width:calc(100% + 24px);margin:0 -12px;padding:0 8px;overflow-x:auto;scrollbar-width:none}
+  nav button{padding:8px 11px;flex:none}
+  main{padding:12px}
+  .panel{padding:14px;border-radius:14px}
+  .view>.panel+.panel,.stack>*+*{margin-top:14px}
+  h2{font-size:17px}
+  .item{gap:10px;padding:8px}
+  .item{grid-template-columns:auto 76px minmax(0,1fr) auto}
+  .vclip,#lib .item{grid-template-columns:76px minmax(0,1fr) auto}
+  .item img,.nothumb,.vrow img,.vrow .nothumb{width:76px}
+  .vrow{grid-template-columns:96px minmax(0,1fr) auto;grid-template-areas:"th t t" "th st ac";row-gap:6px}
+  .vrow img,.vrow .nothumb{width:96px;grid-area:th;align-self:start}
+  .vrow .t{grid-area:t}.vrow .state{grid-area:st;text-align:left}.vrow .acts{grid-area:ac}
+  .state>span{max-width:100%}
+  #proj .item{grid-template-columns:auto 76px minmax(0,1fr)}
+  #proj .item>:nth-child(-n+2){grid-row:span 2}
+  #proj .acts{justify-content:flex-start}
+  .keysbox{display:none}  /* raccourcis clavier : inutiles au téléphone */
+  .item .t>div:first-child{white-space:normal}
+  .item .t>div:first-child>*{white-space:nowrap}
+  .vol{width:90px}
+  .enudge{justify-content:center;gap:8px 14px}
+  .total{font-size:28px}
+  .modal{padding:8px}
+  .modal .box{padding:14px;border-radius:16px}
+}
 </style>
 </head>
 <body>
 <header>
-  <h1>Best-of <b>GTA 6</b></h1>
+  <a class="logo" href="#videos"><img src="/static/logo.png" alt="Orpailleur"></a>
   <nav>
-    <button data-v="collecte">Collecte</button>
+    <button data-v="videos">Vidéos</button>
     <button data-v="tri">Tri <span class="badge" id="nNew">0</span></button>
-    <button data-v="bestof">Best-of <span class="badge" id="nBo" style="background:#444b58">0:00</span></button>
+    <button data-v="bestof">Best-of <span class="badge dim" id="nBo">0:00</span></button>
+    <button data-v="streamers">Streamers</button>
     <button data-v="machines">Machines</button>
-    <button data-v="sources">Sources</button>
   </nav>
   <span class="me small">Trié par : <a href="#" id="meName"></a></span>
 </header>
 
 <main>
-<!-- ================= COLLECTE ================= -->
-<section class="view" id="v-collecte">
-  <div class="grid2" style="grid-template-columns:minmax(0,3fr) minmax(0,2fr)">
-    <div>
-      <div class="panel">
-        <div class="row" style="justify-content:space-between">
-          <h2 style="margin:0">VODs des dernières 24 h</h2>
-          <div class="row">
-            <label class="small muted"><input type="checkbox" id="vGta" checked> GTA uniquement</label>
-            <label class="small muted" title="Whisper transcrit les passages repérés, Claude garde les meilleurs et propose catégorie et note"><input type="checkbox" id="vAi"> 🤖 IA (Claude)</label>
-            <label class="small muted">Extraits max / vidéo <input type="number" id="vMax" min="1" max="50" style="width:60px"></label>
-            <button id="vScan">↻ Actualiser</button>
-            <button class="primary" id="vAll">Analyser les nouvelles</button>
-          </div>
-        </div>
-        <p class="small muted" id="vInfo" style="margin:6px 0 0"></p>
-        <div class="list" id="vList"></div>
+<!-- ================= VIDÉOS ================= -->
+<section class="view" id="v-videos">
+  <div class="panel add">
+    <h2>Ajouter une vidéo</h2>
+    <div class="row">
+      <input type="text" id="aIn" class="link" placeholder="Colle un lien YouTube, Twitch ou Kick (vidéo, clip ou Short)">
+      <label class="small muted">ou envoyer un fichier <input type="file" id="aFile" accept="video/*"></label>
+    </div>
+    <div class="row opt">
+      <label class="small muted">Streamer <input type="text" id="aStr" placeholder="facultatif" style="width:150px"></label>
+      <label class="small muted">Seulement un passage : de <input type="text" id="aFrom" class="time" placeholder="1:20:00">
+        à <input type="text" id="aTo" class="time" placeholder="1:35:00"></label>
+    </div>
+    <div class="choices">
+      <button class="primary" data-mode="whole">Mettre directement dans le Tri
+        <small>un clip ou un passage court, gardé en entier</small></button>
+      <button data-mode="auto">Trouver les meilleurs moments
+        <small>une longue vidéo : on garde ses meilleurs passages</small></button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="row between">
+      <h2 style="margin:0">Vidéos des streamers</h2>
+      <div class="row">
+        <span class="small muted" id="vUpd"></span>
+        <button id="vAll" hidden>Analyser les nouvelles</button>
+        <button id="vScan">↻ Actualiser</button>
       </div>
-
-      <details class="panel" style="margin-top:16px" id="fBox">
-        <summary style="cursor:pointer"><b>Streamers suivis</b> <span class="muted small" id="fCount"></span></summary>
-        <div class="row" style="margin-top:10px" id="fList"></div>
-        <div class="row" style="margin-top:10px">
-          <select id="fP"><option value="twitch">Twitch</option><option value="youtube">YouTube</option><option value="kick">Kick</option></select>
-          <input type="text" id="fH" placeholder="pseudo (ex. gotaga, @Squeezie)" style="width:200px">
-          <input type="text" id="fName" placeholder="nom affiché" style="width:140px">
-          <button id="fAdd">Ajouter</button>
-        </div>
-      </details>
-
-      <details class="panel" style="margin-top:16px">
-        <summary style="cursor:pointer"><b>Ajouter une vidéo à la main</b> <span class="muted small">(lien ou fichier)</span></summary>
-        <div class="form" style="margin-top:10px">
-          <input type="text" id="cIn" placeholder="Lien Twitch / YouTube / Kick ou chemin d'un fichier">
-          <div class="row">
-            <label class="small muted">Streamer <input type="text" id="cStr" placeholder="auto" style="width:140px"></label>
-            <button class="primary" id="cGo">Analyser</button>
-            <label class="small muted">ou envoyer un fichier : <input type="file" id="cFile" accept="video/*"></label>
-          </div>
-        </div>
-      </details>
     </div>
-    <div>
-    <div class="panel">
-      <h2>Tâches</h2>
-      <p class="small muted" style="margin-top:0">Chaque VOD est analysée en entier avec la détection de <i>gta6-clipper</i> :
-        clips créés par les viewers (Twitch), pics de chat comparés au rythme normal du streamer, et audio (rires, cris, crashs).
-        Les meilleurs moments sont téléchargés en 16:9 1080p puis arrivent dans l'onglet Tri. Compter quelques minutes par VOD.</p>
-      <div id="jobs" class="small muted">Aucune tâche.</div>
+    <div class="row between" style="margin-top:10px">
+      <div class="chips" id="vFilt">
+        <button class="chip" data-f="all">Tout</button><button class="chip" data-f="todo">À faire</button><button class="chip" data-f="done">Faites</button>
+      </div>
+      <label class="small muted"><input type="checkbox" id="vGta" checked> GTA uniquement</label>
     </div>
-    </div>
+    <div id="vList"></div>
   </div>
 </section>
 
 <!-- ================= TRI ================= -->
 <section class="view" id="v-tri" hidden>
-  <div id="tri">
+  <div class="chips" id="tDays"></div>
+  <div class="trigrid">  <!-- pas d'id="tri" : l'adresse #tri ferait défiler la page jusqu'à lui -->
     <div>
-      <div class="player"><video id="tv" playsinline preload="auto"></video></div>
-      <div class="bar" id="tbar"><div class="win" id="twin"></div><div class="pos" id="tpos"></div></div>
-      <div class="row" style="margin-top:10px">
-        <button id="tMute" class="ghost" title="Couper / remettre le son (M)">🔊</button>
-        <input type="range" id="tVol" min="0" max="100" step="5" style="width:180px;padding:0" aria-label="Volume">
-        <span id="tVolV" class="small muted" style="width:40px"></span>
-        <span class="small muted"><kbd>+</kbd> <kbd>−</kbd> volume</span>
-      </div>
-      <div class="cats" id="tcats"></div>
-      <div class="rate wait" id="trate"></div>
-      <div class="row" style="margin-top:12px;justify-content:space-between">
-        <div class="row">
-          <button id="tTrash">✕ Poubelle <kbd>X</kbd></button>
-          <button id="tLater">Plus tard <kbd>↓</kbd></button>
-          <button id="tUndo">⟲ Annuler <kbd>Z</kbd></button>
-        </div>
-        <div class="row">
-          <button id="tIn">Début ici <kbd>I</kbd></button>
-          <button id="tOut">Fin ici <kbd>O</kbd></button>
-        </div>
-      </div>
-      <div class="row panel" style="margin-top:10px;padding:8px 12px;justify-content:space-between">
-        <div class="row">
-          <span class="small muted">Début</span>
-          <button data-tn="in" data-d="-1" title="Commencer 1 s plus tôt">−1 s</button>
-          <b id="tInV" style="width:56px;text-align:center"></b>
-          <button data-tn="in" data-d="1" title="Commencer 1 s plus tard (raccourcit)">+1 s</button>
-        </div>
-        <span>Durée <b id="tDurV"></b></span>
-        <div class="row">
-          <span class="small muted">Fin</span>
-          <button data-tn="out" data-d="-1" title="Finir 1 s plus tôt (raccourcit)">−1 s</button>
-          <b id="tOutV" style="width:56px;text-align:center"></b>
-          <button data-tn="out" data-d="1" title="Finir 1 s plus tard">+1 s</button>
-        </div>
-      </div>
-      <p class="small muted" style="margin:6px 0 0">Astuce : tu peux aussi attraper les bords roses de la barre et les faire glisser.</p>
+      <div id="tEd"></div>
+      <div id="tTools"></div>
     </div>
     <div class="side panel">
       <div id="tmeta" class="empty">Chargement…</div>
+      <div class="cats" id="tcats"></div>
+      <div class="rate wait" id="trate"></div>
+      <div class="tacts">
+        <button id="tTrash">✕ Poubelle <kbd>X</kbd></button>
+        <button id="tLater">Plus tard <kbd>↓</kbd></button>
+        <button id="tUndo">⟲ Annuler <kbd>Z</kbd></button>
+      </div>
       <div id="tflags" hidden>
-        <h2 style="margin-top:12px">Signaler</h2>
+        <h2>Signaler</h2>
         <label class="flag"><input type="checkbox" data-f="radio"> Radio / musique <kbd>R</kbd></label>
         <label class="flag"><input type="checkbox" data-f="cinematic"> Cinématique / fin d'histoire <kbd>C</kbd></label>
         <label class="flag"><input type="checkbox" data-f="violence"> Violence graphique <kbd>V</kbd></label>
       </div>
-      <h2 style="margin-top:14px">Raccourcis</h2>
+      <div class="keysbox">
+      <h2>Raccourcis</h2>
       <div class="keys">
         <span><kbd>Q</kbd>/<kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd></span><span>WTF · FUN · FAIL · EPIC</span>
         <span><kbd>1</kbd>…<kbd>5</kbd></span><span>note (valide et passe au suivant)</span>
         <span><kbd>Espace</kbd></span><span>pause / lecture</span>
         <span><kbd>←</kbd> <kbd>→</kbd></span><span>reculer / avancer de 3 s</span>
-        <span><kbd>M</kbd></span><span>couper le son</span>
-        <span><kbd>+</kbd> <kbd>−</kbd></span><span>volume ±5 %</span>
-        <span><kbd>I</kbd> <kbd>O</kbd></span><span>régler début / fin ici</span>
-      </div>
+        <span><kbd>M</kbd> <kbd>+</kbd> <kbd>−</kbd></span><span>muet, volume ±5 %</span>
+        <span><kbd>I</kbd> <kbd>O</kbd></span><span>début / fin du morceau ici</span>
+        <span><kbd>K</kbd></span><span>couper ici</span>
+        <span><kbd>Suppr</kbd></span><span>supprimer le morceau choisi</span>
+      </div></div>
     </div>
   </div>
 </section>
@@ -266,11 +408,11 @@ th{color:var(--muted);font-weight:500;font-size:12px}
       <div class="list" id="lib"></div>
     </div>
     <div class="panel">
-      <div class="row" style="justify-content:space-between">
-        <input type="text" id="pName" style="font-weight:700;font-size:15px;flex:1;min-width:160px">
+      <div class="row between">
+        <input type="text" id="pName" style="flex:1;min-width:160px" aria-label="Nom du best-of">
         <label class="small muted">Objectif <input type="number" id="pTarget" min="1" max="60" style="width:60px"> min</label>
       </div>
-      <div class="row" style="margin-top:10px;justify-content:space-between">
+      <div class="row between" style="margin-top:10px">
         <span class="total" id="pTotal">0:00</span>
         <span class="muted small" id="pCount"></span>
       </div>
@@ -280,18 +422,21 @@ th{color:var(--muted);font-weight:500;font-size:12px}
         <button id="pAuto" title="Le meilleur en ouverture, le 2e meilleur en final, le reste au hasard sans le même streamer ni la même catégorie deux fois de suite (nouveau tirage à chaque clic)">Ordre auto</button>
         <button id="pFill" title="Ajoute les meilleurs extraits gardés jusqu'à l'objectif">Remplir jusqu'à l'objectif</button>
         <button id="pClear" class="ghost">Vider</button>
-        <span style="flex:1"></span>
+        <span class="grow"></span>
         <button id="pPreview" title="Joue les extraits à la suite, comme la vidéo finale">▶ Aperçu</button>
         <button class="primary" id="pExport">Exporter</button>
       </div>
       <div class="list" id="proj"></div>
-      <h2 style="margin-top:20px">Exports</h2>
-      <div class="row small muted">
-        <label>Images/s <select id="sFps"><option value="auto">auto</option><option value="30">30</option><option value="60">60</option></select></label>
-        <label><input type="checkbox" id="sLower"> lien du streamer en haut à gauche</label>
+      <h2 class="exps-title">Exports</h2>
+      <div class="row small">
+        <label><input type="checkbox" id="sLower"> lien de la chaîne en haut à gauche</label>
         <a href="/api/description.txt" target="_blank">Aperçu description YouTube</a>
         <a href="/api/sources.csv">Tableau des sources (CSV)</a>
       </div>
+      <details class="opts small muted" style="margin-top:6px">
+        <summary>Options</summary>
+        <label>Images/s <select id="sFps"><option value="auto">auto</option><option value="30">30</option><option value="60">60</option></select></label>
+      </details>
       <div id="exps" class="small" style="margin-top:8px"></div>
       <div class="row" style="margin-top:16px">
         <button id="pNew" class="ghost">Terminer ce best-of et en commencer un nouveau</button>
@@ -300,26 +445,56 @@ th{color:var(--muted);font-weight:500;font-size:12px}
   </div>
 </section>
 
-<!-- ================= SOURCES ================= -->
+<!-- ================= STREAMERS ================= -->
+<section class="view" id="v-streamers" hidden>
+  <div class="panel" id="fBox">
+    <h2>Streamers suivis <span class="muted small" id="fCount"></span></h2>
+    <p class="small muted" style="margin-top:0">Leurs vidéos des dernières 24 h arrivent toutes seules dans l'onglet Vidéos.</p>
+    <div class="row follow" id="fList"></div>
+    <div class="row" style="margin-top:12px">
+      <select id="fP"><option value="twitch">Twitch</option><option value="youtube">YouTube</option><option value="kick">Kick</option></select>
+      <input type="text" id="fH" placeholder="pseudo (ex. gotaga, @Squeezie)" style="width:200px">
+      <input type="text" id="fName" placeholder="nom affiché" style="width:140px">
+      <button id="fAdd">Ajouter</button>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>Autorisations</h2>
+    <p class="small muted" style="margin-top:0">Pour publier, note si le streamer a autorisé l'utilisation de ses passages ; son nom et son lien servent aux crédits de la description YouTube.</p>
+    <div class="tablewrap"><table id="srcT"></table></div>
+  </div>
+</section>
+
 <!-- ================= MACHINES ================= -->
 <section class="view" id="v-machines" hidden>
   <div class="grid2">
-    <div class="panel">
-      <h2>Machines</h2>
-      <p class="small muted" style="margin-top:0">Chaque machine analyse des VODs chez elle (chat, audio, Whisper) ; ce PC demande
-        ensuite à Claude et télécharge les extraits.</p>
-      <div id="maList" class="small"></div>
+    <div class="stack">
+      <div class="panel">
+        <h2>Machines</h2>
+        <p class="small muted" style="margin-top:0">Chaque machine analyse des VODs chez elle (chat, audio, Whisper) ; ce PC demande
+          ensuite à Claude et télécharge les extraits.</p>
+        <div id="maList" class="small"></div>
+      </div>
+      <div class="panel">
+        <h2>Journal</h2>
+        <div id="jobs" class="small muted">Aucune tâche.</div>
+      </div>
     </div>
-    <div class="panel">
-      <h2>Inviter un ami</h2>
-      <p class="small muted" style="margin-top:0">Tape son prénom : le site prépare tout le message à lui envoyer (Tailscale,
-        installation du moteur sur Windows ou Mac, lien pour trier). Un message par ami : il contient la clé de sa machine.</p>
-      <div class="row"><input type="text" id="maNew" placeholder="prénom (ex. Jean)" style="flex:1">
-        <button class="primary" id="maAdd">Créer le message</button></div>
-      <div id="maOut"></div>
-      <details style="margin-top:14px">
-        <summary style="cursor:pointer" class="small"><b>Réglages</b> <span class="muted">(une fois)</span></summary>
-        <div class="form" style="margin-top:10px">
+    <div class="stack">
+      <div class="panel">
+        <h2>Inviter un ami</h2>
+        <p class="small muted" style="margin-top:0">Tape son prénom : le site prépare tout le message à lui envoyer (Tailscale,
+          installation du moteur sur Windows ou Mac, lien pour trier). Un message par ami : il contient la clé de sa machine.</p>
+        <div class="row"><input type="text" id="maNew" placeholder="prénom (ex. Jean)" style="flex:1">
+          <button class="primary" id="maAdd">Créer le message</button></div>
+        <div id="maOut"></div>
+      </div>
+      <div class="panel">
+        <h2>Réglages</h2>
+        <div class="form">
+          <label class="small muted inl" title="Whisper transcrit les passages repérés, Claude garde les meilleurs et propose catégorie et note">
+            <input type="checkbox" id="sAi"> IA (Claude) : choisit les meilleurs moments et propose catégorie et note</label>
+          <label class="small muted inl">Extraits max par vidéo <input type="number" id="sMax" min="1" max="50" style="width:80px"></label>
           <label class="small muted">Adresse Tailscale du serveur
             <input type="text" id="maUrl" placeholder="https://bestof.tailXXXX.ts.net" style="width:100%"></label>
           <label class="small muted">Dépôt GitHub <input type="text" id="maGit" placeholder="pseudo/depot" style="width:100%"></label>
@@ -327,43 +502,20 @@ th{color:var(--muted);font-weight:500;font-size:12px}
             <input type="text" id="maInv" placeholder="https://login.tailscale.com/admin/invite/…" style="width:100%"></label>
           <div class="row"><button id="maSave">Enregistrer</button></div>
         </div>
-      </details>
+      </div>
     </div>
-  </div>
-</section>
-
-<section class="view" id="v-sources" hidden>
-  <div class="panel">
-    <h2>Sources et autorisations</h2>
-    <p class="small muted" style="margin-top:0">Le nom et le lien du streamer servent aux crédits de la description YouTube. Mets l'autorisation à jour au fil des réponses.</p>
-    <div class="tablewrap"><table id="srcT"></table></div>
   </div>
 </section>
 </main>
 
 <div class="modal" id="mTrim" hidden>
   <div class="box">
-    <div class="row" style="justify-content:space-between"><h2 id="mTitle" style="margin:0"></h2><button id="mClose">Fermer</button></div>
-    <div class="player" style="margin-top:10px"><video id="mv" playsinline controls></video></div>
-    <div class="bar" id="mbar"><div class="win" id="mwin"></div><div class="pos" id="mpos"></div></div>
-    <div class="row" style="margin-top:10px;justify-content:space-between">
-      <div class="row">
-        <button id="mIn">Début ici</button>
-        <button data-n="in" data-d="-0.5">−0,5 s</button><button data-n="in" data-d="0.5">+0,5 s</button>
-        <span class="muted">Début <b id="mInV"></b></span>
-      </div>
-      <div class="row">
-        <span class="muted">Fin <b id="mOutV"></b></span>
-        <button data-n="out" data-d="-0.5">−0,5 s</button><button data-n="out" data-d="0.5">+0,5 s</button>
-        <button id="mOut">Fin ici</button>
-      </div>
-    </div>
-    <div class="row" style="margin-top:10px">
-      <button id="mPlay">▶ Lire l'extrait</button>
-      <span class="muted">Durée : <b id="mDur"></b></span>
-      <span style="flex:1"></span>
-      <select id="mCat"></select>
+    <div class="row between head"><h2 id="mTitle"></h2><button id="mClose">Fermer</button></div>
+    <div id="mEd" style="margin-top:10px"></div>
+    <div class="row msave">
+      <select id="mCat"><option value="">Catégorie…</option></select>
       <span class="stars edit" id="mStars"></span>
+      <span class="grow"></span>
       <button class="primary" id="mSave">Enregistrer</button>
     </div>
   </div>
@@ -371,20 +523,26 @@ th{color:var(--muted);font-weight:500;font-size:12px}
 
 <div class="modal" id="mPrev" hidden>
   <div class="box">
-    <div class="row" style="justify-content:space-between"><h2 id="pvTitle" style="margin:0"></h2><button id="pvClose">Fermer</button></div>
-    <div class="player" style="margin-top:10px"><video id="pv" playsinline></video>
-      <span id="pvCredit" style="position:absolute;left:2%;top:3.5%;background:#0008;color:#fff;font:600 clamp(10px,1.8vw,18px) Poppins,system-ui,sans-serif;padding:.3em .6em"></span></div>
-    <div class="gauge" style="margin-top:8px"><div id="pvBar" style="width:0"></div></div>
-    <div class="row" style="justify-content:space-between">
-      <div class="row"><button id="pvPrev">⏮ Précédent</button><button id="pvPlay">⏯</button><button id="pvNext">Suivant ⏭</button></div>
-      <span class="muted"><b id="pvTime">0:00</b> / <span id="pvTotal">0:00</span></span>
+    <div class="row between head"><h2 id="pvTitle"></h2><button id="pvClose">Fermer</button></div>
+    <div class="player" style="margin-top:10px"><video id="pv" playsinline></video><span id="pvCredit" class="credit"></span></div>
+    <div class="gauge pvbar" id="pvBarW" title="Clic : aller à cet endroit"><div id="pvBar" style="width:0"></div></div>
+    <div class="row between">
+      <div class="row">
+        <button id="pvPrev" title="Extrait précédent">⏮</button><button id="pvPlay" title="Lecture / pause (Espace)">⏯</button><button id="pvNext" title="Extrait suivant">⏭</button>
+        <button id="pvBack" title="Reculer de 3 s (←)">−3 s</button><button id="pvFwd" title="Avancer de 3 s (→)">+3 s</button>
+      </div>
+      <span class="muted etime"><b id="pvTime">0:00</b> / <span id="pvTotal">0:00</span></span>
+      <div class="row">
+        <button class="ghost vmute" title="Couper / remettre le son (M)">🔊</button>
+        <input type="range" class="vol" min="0" max="100" step="5" aria-label="Volume"><span class="volv small muted"></span>
+      </div>
     </div>
   </div>
 </div>
 
 <div class="modal" id="mVod" hidden>
   <div class="box">
-    <div class="row" style="justify-content:space-between"><h2 id="mvTitle" style="margin:0"></h2><button id="mvClose">Fermer</button></div>
+    <div class="row between head"><h2 id="mvTitle"></h2><button id="mvClose">Fermer</button></div>
     <div id="mvInfo" class="small muted" style="margin-top:6px"></div>
     <div class="list" id="mvList"></div>
   </div>
@@ -405,19 +563,68 @@ const CATS = ["WTF","FUN","FAIL","EPIC"];
 const CAT_KEYS = {q:"WTF",a:"WTF",s:"FUN",d:"FAIL",f:"EPIC"};
 const CAT_HINT = {WTF:"Comportements improbables",FUN:"Situations hilarantes",FAIL:"Accidents, ratés",EPIC:"Cascades, poursuites"};
 const DIGIT = {Digit1:1,Digit2:2,Digit3:3,Digit4:4,Digit5:5,Numpad1:1,Numpad2:2,Numpad3:3,Numpad4:4,Numpad5:5};
-let S = null, view = "collecte";
+const VIEWS = ["videos","tri","bestof","streamers","machines"], ALIAS = {collecte:"videos", sources:"streamers"};
+let S = null, view = "videos";
 const store = {get(k){try{return localStorage.getItem(k)}catch(e){return null}}, set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
 let me = store.get("bo_user") || "";
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt = s => { s = Math.max(0, Math.round(s||0)); const h = Math.floor(s/3600), m = Math.floor(s%3600/60), x = s%60;
   return h ? `${h}:${String(m).padStart(2,"0")}:${String(x).padStart(2,"0")}` : `${m}:${String(x).padStart(2,"0")}`; };
-const steps = a => a.steps ? " · en " + fmt(a.total) + " (" + a.steps.map(([n, d]) => esc(n) + " " + fmt(d)).join(", ") + ")" : "";
 const fmt1 = s => (Math.round(s*10)/10).toFixed(1).replace(".", ",") + " s";
-const dur = c => Math.max(0, c.out - c.in);
+
+/* ---- morceaux d'un extrait : logique pure (testée avec node) ---- */
+const MIN_PIECE = .5;
+const r2 = x => Math.round(x * 100) / 100;
+const segsOf = c => c.segs && c.segs.length ? c.segs : [[c.in, c.out]];
+const segsDur = sg => sg.reduce((a, [x, y]) => a + Math.max(0, y - x), 0);
+const dur = c => segsDur(segsOf(c));
+const segAt = (sg, t) => sg.findIndex(([a, b]) => t >= a - .05 && t < b);  // morceau sous t, -1 dans un trou
+const nextSeg = (sg, t) => sg.findIndex(([a]) => a > t);
+const segsElapsed = (sg, t) => sg.reduce((s, [a, b]) => s + Math.min(b - a, Math.max(0, t - a)), 0);  // temps utile déjà joué
+// lecture à t : null = dans un morceau ; sinon où sauter (début du morceau suivant, le 1er en boucle) ; -1 = arrêt
+const playJump = (sg, t, loop) => segAt(sg, t) >= 0 ? null : nextSeg(sg, t) >= 0 ? sg[nextSeg(sg, t)][0] : loop ? sg[0][0] : -1;
+// début (side 0) ou fin (side 1) du morceau i placé à t, borné par les voisins et 0,5 s minimum : jamais de chevauchement
+function moveEdge(sg, i, side, t, D){
+  const [a, b] = sg[i], lo = side ? a + MIN_PIECE : i ? sg[i - 1][1] : 0, hi = side ? (i < sg.length - 1 ? sg[i + 1][0] : D) : b - MIN_PIECE;
+  const x = side ? Math.min(hi, Math.max(lo, t)) : Math.max(lo, Math.min(hi, t));  // le voisin gagne toujours
+  const out = sg.map(p => p.slice()); out[i][side] = r2(x); return out;
+}
+function cutAt(sg, t){  // coupe en deux le morceau sous t ; null si pas de morceau ou si un côté ferait moins de 0,5 s
+  const i = segAt(sg, t); if (i < 0) return null;
+  const [a, b] = sg[i]; t = r2(t);
+  return t - a >= MIN_PIECE && b - t >= MIN_PIECE ? [...sg.slice(0, i), [a, t], [t, b], ...sg.slice(i + 1)] : null;
+}
+// « Début ici » / « Fin ici » : le morceau sous la tête ; dans un trou, le suivant (début) ou le précédent (fin) ; -1 si aucun
+function edgeTarget(sg, t, side){
+  const i = segAt(sg, t); if (i >= 0) return i;
+  const k = nextSeg(sg, t); return side ? (k < 0 ? sg.length - 1 : k - 1) : k;
+}
+// bord attrapé sur la barre ([morceau, côté]) : le plus proche à moins de tol, le morceau choisi d'abord, puis le côté du pointeur
+function edgeNear(sg, sel, t, tol){
+  let best = null, bs = Infinity;
+  sg.forEach(([a, b], i) => [a, b].forEach((x, side) => {
+    const d = Math.abs(t - x); if (d > tol) return;
+    const s = d + (i === sel ? 0 : tol) + ((side ? t > x : t < x) ? tol / 2 : 0);
+    if (s < bs) { bs = s; best = [i, side]; }
+  }));
+  return best;
+}
+function flatPieces(cs){  // aperçu : tous les morceaux du best-of à la suite, avec leur position dans la vidéo finale
+  const pl = []; let off = 0;
+  cs.forEach((c, ci) => segsOf(c).forEach(([a, b]) => { pl.push({c, ci, a, b, off}); off += b - a; }));
+  return pl;
+}
+const pieceAt = (pl, g) => { const k = pl.findIndex(e => g < e.off + e.b - e.a); return k < 0 ? pl.length - 1 : k; };
+/* ---- fin des morceaux ---- */
+
 const stars = n => n ? "★".repeat(n) + "<span style='color:#444b58'>" + "★".repeat(5-n) + "</span>" : "<span class='muted'>—</span>";
 const src = c => (S && S.sources.find(s => s.id === c.source_id)) || c.source || {};
-function toast(t){ const d = document.createElement("div"); d.className="toast"; d.textContent=t; document.body.append(d); setTimeout(()=>d.remove(), 2600); }
+const whyText = c => c.ai && c.ai.reason ? c.ai.reason : /^ajouté par /.test(c.why || "") ? c.why : "";  // jamais les signaux bruts
+const addedBy = c => /^ajouté par /.test(c.why || "") ? c.why : src(c).added_by ? "ajouté par " + src(c).added_by : "";
+function toast(t){ const d = document.createElement("div"); d.className="toast"; d.textContent=t; document.body.append(d); setTimeout(()=>d.remove(), 3200); }
+// un bouton cliqué à la souris rend le focus : Espace / Entrée restent des raccourcis au lieu de recliquer dessus
+document.addEventListener("click", e => { const b = e.target.closest("button"); if (b && e.detail) b.blur(); });
 
 async function api(path, body){
   const o = {headers:{"X-User": encodeURIComponent(me||"?")}};
@@ -429,16 +636,153 @@ async function api(path, body){
   return j;
 }
 
-/* ---------------- navigation ---------------- */
+/* ---------------- volume : 25 % par défaut, mémorisé, commun à tous les lecteurs ---------------- */
+let vol = (() => { const v = store.get("bo_vol"); return v === null || isNaN(+v) ? 25 : +v; })(), muted = false;
+function applyVol(){
+  vol = Math.max(0, Math.min(100, Math.round(vol / 5) * 5)); store.set("bo_vol", vol);
+  for (const v of $$("video")) { v.volume = vol / 100; v.muted = muted || vol === 0; }
+  $$(".vol").forEach(r => r.value = vol); $$(".volv").forEach(s => s.textContent = vol + " %");
+  $$(".vmute").forEach(b => b.textContent = muted || vol === 0 ? "🔇" : vol < 40 ? "🔉" : "🔊");
+}
+function setVol(v){ vol = v; muted = false; applyVol(); }
+const toggleMute = () => { muted = !muted; applyVol(); };
+const VOL_KEYS = {m: toggleMute, "+": () => setVol(vol + 5), "=": () => setVol(vol + 5), "-": () => setVol(vol - 5)};
+
+/* ---------------- lecteur / éditeur partagé : Tri, réglage d'un extrait ----------------
+   La barre montre les morceaux (roses) et les trous (sombres) ; la lecture ne joue que les morceaux. Se placer soi-même dans
+   un trou (clic, ←/→) le laisse jouer, pour voir ce qu'il y a autour et allonger un morceau. */
+const ED_PLAY = `<div class="player"><video playsinline preload="auto"></video></div>
+  <div class="pbar" title="Clic : se placer · bords du morceau : allonger ou raccourcir"><div class="ph"></div></div>
+  <div class="row ectl">
+    <button data-a="play" title="Lecture / pause (Espace)">⏯</button>
+    <button data-a="back" title="Reculer de 3 s (←)">−3 s</button><button data-a="fwd" title="Avancer de 3 s (→)">+3 s</button>
+    <span class="etime"><b class="ecur">0:00</b> / <span class="etot">0:00</span></span>
+    <span class="grow"></span>
+    <button class="ghost vmute" title="Couper / remettre le son (M)">🔊</button>
+    <input type="range" class="vol" min="0" max="100" step="5" aria-label="Volume"><span class="volv small muted"></span>
+  </div>`;
+const ED_TOOLS = `<div class="row ecut">
+    <button data-a="in" title="Le morceau commence ici">Début ici <kbd>I</kbd></button>
+    <button data-a="out" title="Le morceau finit ici">Fin ici <kbd>O</kbd></button>
+    <button data-a="cut" title="Sépare le morceau en deux ici">✂ Couper ici <kbd>K</kbd></button>
+    <button data-a="del" title="Enlève le morceau choisi">Supprimer ce morceau <kbd>Suppr</kbd></button>
+  </div>
+  <div class="row enudge">
+    <span class="row"><span class="small muted">Début</span><button data-a="in-" title="Commencer 1 s plus tôt">−1 s</button><b class="einv"></b><button data-a="in+" title="Commencer 1 s plus tard">+1 s</button></span>
+    <span><span class="epiece small muted"></span> Durée <b class="edur"></b></span>
+    <span class="row"><span class="small muted">Fin</span><button data-a="out-" title="Finir 1 s plus tôt">−1 s</button><b class="eoutv"></b><button data-a="out+" title="Finir 1 s plus tard">+1 s</button></span>
+  </div>`;
+function makeEditor(root, loop, tools = root){
+  root.innerHTML = ED_PLAY;
+  tools.insertAdjacentHTML("beforeend", ED_TOOLS);
+  const q = s => root.querySelector(s) || tools.querySelector(s), v = q("video"), bar = q(".pbar");
+  let c = null, sg = [], D = 1, sel = 0, free = false, drag = null, wasPlaying = false, raf = 0;
+  const T = () => v.currentTime;
+
+  function draw(){
+    bar.querySelectorAll(".pc").forEach(x => x.remove());
+    bar.insertAdjacentHTML("afterbegin", sg.map(([a, b], i) => `<div class="pc${i === sel ? " on" : ""}" style="left:${a / D * 100}%;width:${(b - a) / D * 100}%">${
+      i === sel ? "<i class='h'></i><i class='h r'></i>" : ""}</div>`).join(""));
+    const p = sg[sel];
+    q(".einv").textContent = p ? fmt1(p[0]) : ""; q(".eoutv").textContent = p ? fmt1(p[1]) : "";
+    q(".epiece").textContent = sg.length > 1 ? `Morceau ${sel + 1}/${sg.length} ·` : "";
+    q(".edur").textContent = c ? fmt1(segsDur(sg)) : "";
+    q("[data-a=del]").hidden = sg.length < 2;
+    drawPos();
+  }
+  function drawPos(){
+    q(".ph").style.left = (c ? Math.min(100, T() / D * 100) : 0) + "%";
+    q(".ecur").textContent = fmt(segsElapsed(sg, T())); q(".etot").textContent = fmt(segsDur(sg));
+  }
+  function seek(t){ if (!c) return; t = Math.max(0, Math.min(D, t)); const i = segAt(sg, t); free = i < 0; if (i >= 0) sel = i; v.currentTime = t; draw(); }
+  function play(){
+    if (!c) return;
+    if (v.ended || (!free && playJump(sg, T(), false) === -1)) { free = false; v.currentTime = sg[0][0]; }  // fini : on repart du début
+    v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });  // le navigateur bloque le son avant le 1er clic
+  }
+  const toggle = () => v.paused ? play() : v.pause();
+  function check(){
+    if (!c || drag) return;
+    const i = segAt(sg, T());
+    if (i >= 0) { free = false; if (i !== sel) { sel = i; draw(); } return; }
+    if (free) return;
+    const j = playJump(sg, T(), loop);
+    if (j === -1) v.pause(); else v.currentTime = j;
+  }
+  v.onplay = () => { cancelAnimationFrame(raf); const f = () => { if (v.paused) return; check(); drawPos(); raf = requestAnimationFrame(f); }; raf = requestAnimationFrame(f); };
+  v.ontimeupdate = () => { if (!v.paused) check(); drawPos(); };
+  v.onended = () => { if (c && loop) { free = false; v.currentTime = sg[0][0]; v.play().catch(() => {}); } };
+
+  function edgeHere(side){
+    if (!c) return; const t = T(), i = edgeTarget(sg, t, side);
+    if (i < 0) return toast(side ? "Place-toi après le début d'un morceau" : "Place-toi avant la fin d'un morceau");
+    const [a, b] = sg[i];
+    if (side ? t < a + MIN_PIECE : t > b - MIN_PIECE) return toast("Un morceau dure au moins 0,5 s");
+    sg = moveEdge(sg, i, side, t, D); sel = i; free = false; draw(); toast(side ? "Fin réglée" : "Début réglé");
+  }
+  function nudge(side, d){
+    if (!c) return; sg = moveEdge(sg, sel, side, sg[sel][side] + d, D);
+    const [a, b] = sg[sel]; free = false; v.currentTime = side ? Math.max(a, b - 3) : a; draw();
+  }
+  function cut(){
+    if (!c) return; const t = T(), i = segAt(sg, t);
+    if (i < 0) return toast("Place la tête de lecture sur un morceau rose");
+    const r = cutAt(sg, t); if (!r) return toast("Trop près du bord : il faut au moins 0,5 s de chaque côté");
+    sg = r; sel = i + 1; draw(); toast("Coupé en deux : choisis un morceau pour le raccourcir ou l'allonger");
+  }
+  function del(){
+    if (!c) return; if (sg.length < 2) return toast("Il faut garder au moins un morceau");
+    sg = sg.filter((_, k) => k !== sel); sel = Math.min(sel, sg.length - 1); free = false; draw();
+  }
+  const ACT = {play: toggle, back: () => seek(T() - 3), fwd: () => seek(T() + 3), in: () => edgeHere(0), out: () => edgeHere(1), cut, del,
+    "in-": () => nudge(0, -1), "in+": () => nudge(0, 1), "out-": () => nudge(1, -1), "out+": () => nudge(1, 1)};
+  [root, tools].forEach(el => el.querySelectorAll("[data-a]").forEach(b => b.onclick = ACT[b.dataset.a]));
+
+  /* barre : clic = se placer (et choisir le morceau) ; attraper un bord = allonger / raccourcir ce morceau */
+  const xT = e => { const r = bar.getBoundingClientRect(); return Math.max(0, Math.min(D, (e.clientX - r.left) / r.width * D)); };
+  const near = e => edgeNear(sg, sel, xT(e), D * (e.pointerType === "touch" ? 18 : 9) / bar.getBoundingClientRect().width);
+  bar.onpointerdown = e => {
+    if (!c) return; e.preventDefault();
+    const h = near(e);
+    if (!h) return seek(xT(e));
+    drag = h; sel = h[0]; wasPlaying = !v.paused; v.pause(); bar.setPointerCapture(e.pointerId); draw();
+  };
+  bar.onpointermove = e => {
+    if (!c) return;
+    if (!drag) { bar.style.cursor = near(e) ? "ew-resize" : "pointer"; return; }
+    sg = moveEdge(sg, drag[0], drag[1], xT(e), D); v.currentTime = sg[drag[0]][drag[1]]; draw();
+  };
+  bar.onpointerup = bar.onpointercancel = () => {
+    if (!drag) return; const [i, side] = drag, [a, b] = sg[i]; drag = null; free = false;
+    v.currentTime = side ? Math.max(a, b - 3) : a; draw(); if (wasPlaying) play();
+  };
+
+  function load(clip, auto){
+    c = clip; sg = segsOf(clip).map(p => p.slice()); sel = 0; free = false; drag = null;
+    D = Math.floor((clip.file_dur || sg[sg.length - 1][1]) * 100) / 100;
+    v.src = "/files/" + clip.file; v.currentTime = sg[0][0]; applyVol(); draw();
+    if (auto) play();
+  }
+  function clear(){ c = null; sg = []; v.pause(); v.removeAttribute("src"); v.load(); draw(); }
+  // raccourcis du lecteur ; true si la touche a servi
+  function key(k){ const f = {" ": toggle, arrowleft: ACT.back, arrowright: ACT.fwd, i: ACT.in, "[": ACT.in, o: ACT.out, "]": ACT.out, k: cut, delete: del}[k];
+    if (f) f(); return !!f; }
+  draw();
+  return {load, clear, key, pause: () => v.pause(), get segs(){ return sg.map(p => p.slice()); }};
+}
+
+/* ---------------- navigation (#videos #tri #bestof #streamers #machines) ---------------- */
+const viewOf = h => { h = ALIAS[h] || h; return VIEWS.includes(h) ? h : null; };
 function show(v){
   view = v; store.set("bo_view", v);
   $$("nav button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
   $$(".view").forEach(s => s.hidden = s.id !== "v-"+v);
-  if (v !== "tri") $("#tv").pause();
+  if (v !== "tri") tEd.pause();
   if (v === "tri" && !cur) loadNext();
   render();
 }
-$$("nav button").forEach(b => b.onclick = () => show(b.dataset.v));
+$$("nav button").forEach(b => b.onclick = () => { location.hash = b.dataset.v; });
+window.onhashchange = () => { const v = viewOf(location.hash.slice(1)); if (v && v !== view) show(v); };
 
 async function refresh(){
   S = await api("/api/state");
@@ -448,71 +792,147 @@ function render(){
   if (!S) return;
   const nNew = S.clips.filter(c => c.status === "new").length;
   $("#nNew").textContent = nNew;
-  const tot = S.project.items.map(id => S.clips.find(c => c.id === id)).filter(Boolean).reduce((a,c)=>a+dur(c),0);
-  $("#nBo").textContent = fmt(tot);
-  if (view === "collecte") { renderVods(); renderJobs(); }
-  if (view === "machines") renderMachines();
+  $("#nBo").textContent = fmt(projItems().reduce((a,c)=>a+dur(c),0));
+  if (view === "videos") renderVods();
+  if (view === "machines") { renderMachines(); renderJobs(); }
   if (vodOpen && $("#mTrim").hidden) renderVod();
   if (view === "bestof") renderBestof();
-  if (view === "sources") renderSources();
+  if (view === "streamers") { renderFollow(); renderSources(); }
   if (view === "tri" && !cur && nNew) loadNext();
 }
 
-/* ---------------- collecte ---------------- */
-$("#cGo").onclick = async () => {
-  const input = $("#cIn").value.trim(); if (!input) return toast("Colle un lien");
-  await api("/api/collect", {input, streamer:$("#cStr").value});
-  $("#cIn").value = ""; toast("Analyse lancée"); refresh();
-};
-$("#cIn").onkeydown = e => { if (e.key === "Enter") $("#cGo").click(); };
-
-/* VODs des dernières 24 h */
-const ago = h => h == null ? "" : h < 1 ? "il y a " + Math.max(1, Math.round(h*60)) + " min" : "il y a " + Math.round(h) + " h";
-const STATE = {"nouvelle":"", "en attente":"en file", "en cours":"analyse en cours…", "finalisation":"finalisation (Claude + extraits)", "analysée":"analysée"};
-const stateTxt = v => v.state === "en cours" && v.machine ? "en cours sur " + esc(v.machine) + (v.step ? " · " + esc(v.step) : "")
-  : STATE[v.state] || esc(v.state);
-$("#vGta").onchange = () => renderVods();
-$("#vScan").onclick = async () => { const r = await api("/api/scan", {}); toast(r.status === "déjà en cours" ? "Recherche déjà en cours" : "Recherche des VODs…"); refresh(); };
-$("#vAll").onclick = async () => {
-  const urls = shownVods().filter(v => v.state === "nouvelle" && !v.recording).map(v => v.url);
-  if (!urls.length) return toast("Aucune nouvelle VOD à analyser");
-  const r = await api("/api/analyze", {urls}); toast(r.queued + " VOD(s) en file d'analyse"); refresh(); };
-$("#vAi").onchange = async () => { S.settings = await api("/api/settings", {ai:$("#vAi").checked});
-  toast($("#vAi").checked ? "Mode IA activé : Claude choisit les moments" : "Mode IA désactivé : sélection automatique"); };
-$("#vMax").onchange = async () => { const n = parseInt($("#vMax").value, 10); if (!(n >= 1 && n <= 50)) return;
-  S.settings = await api("/api/settings", {max_moments:n}); toast(n + " extraits max par vidéo"); };
-const shownVods = () => S.vods.filter(v => !$("#vGta").checked || v.gta);
-function renderVods(){
-  if (document.activeElement !== $("#vMax")) $("#vMax").value = S.settings.max_moments;
-  $("#vAi").checked = S.settings.ai !== false;
-  const scanning = S.jobs.find(j => j.kind === "scan" && /attente|cours/.test(j.status));
-  const vs = shownVods(), hidden = S.vods.length - vs.length;
-  $("#vInfo").textContent = (scanning ? "Recherche en cours… " : "") + (S.vods_scan ? "Dernière recherche : " + S.vods_scan + ". " : "")
-    + (hidden ? hidden + " VOD(s) hors GTA masquée(s). " : "") + "Mise à jour automatique toutes les heures.";
-  $("#vList").innerHTML = vs.length ? vs.map(v => `<div class="item" style="grid-template-columns:120px minmax(0,1fr) auto">
-      ${v.thumb ? `<img src="${esc(v.thumb)}" alt="" style="width:120px" referrerpolicy="no-referrer">` : `<div style="width:120px;aspect-ratio:16/9;background:#000;border-radius:6px"></div>`}
-      <div class="t">
-        <div><b>${esc(v.streamer)}</b> <span class="muted small">${esc(v.platform)} · ${fmt(v.duration)} · ${ago(v.age_h)}${v.game ? " · " + esc(v.game) : ""}</span></div>
-        <div class="small muted" title="${esc(v.title)}"><a href="${esc(v.url)}" target="_blank" rel="noopener">${esc(v.title || "(sans titre)")}</a></div>
-        <div class="small">${v.recording ? "<span style='color:var(--warn)'>● stream encore en cours : attends la fin</span>"
-          : v.state === "analysée" ? `<span style="color:var(--ok)">✓ analysée${v.analyses.length ? " (" + esc(v.analyses[v.analyses.length-1].mode)
-               + (v.analyses[v.analyses.length-1].total ? ", " + fmt(v.analyses[v.analyses.length-1].total) : "") + ")" : ""}</span>
-             <span class="muted">· ${v.counts.new} à trier · ${v.counts.kept} gardé(s) · ${v.counts.trash} poubelle</span>
-             ${v.clips ? `<a href="#" data-see="${esc(v.source_id)}">voir les extraits</a>` : ""}`
-          : v.state !== "nouvelle" ? `<span style="color:var(--warn)">${stateTxt(v)}</span>`
-          : v.last_error ? `<span style="color:var(--warn)" title="${esc(v.last_error)}">⚠ échec${v.fails > 1 ? " (" + v.fails + " fois, relance manuelle)" : ""} : ${esc(v.last_error.slice(0, 140))}</span>` : ""}</div>
-      </div>
-      <div class="acts">${v.recording || /attente|cours|finalisation/.test(v.state) ? "" :
-        `<button data-an="${esc(v.url)}">${v.state === "analysée" ? "Réanalyser" : "Analyser"}</button>`}</div></div>`).join("")
-    : `<div class="empty">${scanning ? "Recherche des VODs…" : "Aucune VOD de moins de 24 h" + (hidden ? " sur GTA (décoche « GTA uniquement » pour tout voir)" : "") + ". Vérifie la liste des streamers suivis."}</div>`;
-  $$("[data-an]").forEach(b => b.onclick = async () => { await api("/api/analyze", {urls:[b.dataset.an]}); toast("Analyse lancée"); refresh(); });
-  $$("[data-see]").forEach(a => a.onclick = e => { e.preventDefault(); openVod(a.dataset.see); });
-  renderFollow();
+/* ---------------- vidéos : ajouter à la main ---------------- */
+const TIME_RE = /^\d+(:\d{1,2}){0,2}$/;
+async function addVideo(mode){  // mode : "whole" | "auto" | undefined (le serveur choisit selon la durée)
+  const f = $("#aFile").files[0], input = $("#aIn").value.trim(), streamer = $("#aStr").value.trim();
+  const from = $("#aFrom").value.trim(), to = $("#aTo").value.trim();
+  if (!f && !input) return toast("Colle un lien ou choisis un fichier");
+  if (from && !to) return toast("Indique aussi la fin du passage (ex. 1:35:00)");
+  if ((from && !TIME_RE.test(from)) || (to && !TIME_RE.test(to))) return toast("Écris les temps comme 1:20:00 ou 5:30");
+  const win = to ? (from || "0:00") + "-" + to : "";
+  if (f) {
+    toast("Envoi de " + f.name + "…");
+    const q = new URLSearchParams({name:f.name, max:S.settings.max_moments, window:win, streamer});
+    if (mode) q.set("mode", mode);
+    const r = await fetch("/api/upload?" + q, {method:"POST", body:f, headers:{"X-User":encodeURIComponent(me)}});
+    if (!r.ok) { let m = "Échec de l'envoi"; try { m = (await r.json()).error || m; } catch(e){} return toast(m); }
+    $("#aFile").value = "";
+  } else {
+    await api("/api/collect", {input, streamer, window:win, ...(mode ? {mode} : {})});
+    $("#aIn").value = "";
+  }
+  $("#aFrom").value = $("#aTo").value = "";
+  toast(mode === "auto" ? "C'est parti : les meilleurs moments arriveront dans le Tri d'ici quelques minutes"
+    : mode === "whole" ? "C'est parti : la vidéo arrive dans le Tri dans un instant" : "C'est parti : suis son avancée dans la liste ci-dessous");
+  refresh();
 }
+$$(".add [data-mode]").forEach(b => b.onclick = () => addVideo(b.dataset.mode));
+$("#aIn").onkeydown = e => { if (e.key === "Enter") addVideo(); };
+
+/* ---------------- vidéos : la liste du jour, de la veille, plus ancienne ---------------- */
+const DAYS = [["today","Aujourd'hui"],["yesterday","Hier"],["older","Plus ancien"]];
+const ago = h => h == null ? "" : h < 1 ? "il y a " + Math.max(1, Math.round(h*60)) + " min" : h < 48 ? "il y a " + Math.round(h) + " h" : "il y a " + Math.round(h/24) + " j";
+const dateOf = d => new Date(String(d).replace(" ", "T"));  // « 2026-11-21 14:05:00 », heure locale
+const hoursSince = d => (Date.now() - dateOf(d)) / 36e5;
+function dayOf(d){
+  const x = dateOf(d), t = new Date(); t.setHours(0, 0, 0, 0); const y = new Date(t); y.setDate(y.getDate() - 1);
+  return x >= t ? "today" : x >= y ? "yesterday" : "older";
+}
+const STEP = [[/^(démarrage|lecture du lien)/i,"démarrage"],[/^chat/i,"lecture du chat"],[/^téléchargement de l'audio/i,"téléchargement du son"],
+  [/^analyse audio/i,"écoute du son"],[/^attente de la carte/i,"en attente"],[/^whisper/i,"transcription"],
+  [/^(claude|finalisation)/i,"choix des meilleurs moments"],[/^téléchargement des extraits/i,"téléchargement des extraits"],[/^envoi/i,"envoi du résultat"]];
+const stepWord = s => (STEP.find(([r]) => r.test(s || "")) || [0, ""])[1];
+const shortErr = e => String(e || "").trim().split("\n")[0].replace(/^(error|erreur)\s*:?\s*/i, "").slice(0, 90);
+const nClips = n => n + (n > 1 ? " extraits" : " extrait");
+let vFilt = store.get("bo_vf") || "all";
+$("#vGta").onchange = () => renderVods();
+$$("#vFilt [data-f]").forEach(b => b.onclick = () => { vFilt = b.dataset.f; store.set("bo_vf", vFilt); renderVods(); });
+$("#vScan").onclick = async () => { const r = await api("/api/scan", {}); toast(r.status === "déjà en cours" ? "Recherche déjà en cours" : "Recherche des nouvelles vidéos…"); refresh(); };
+$("#vAll").onclick = async () => {
+  const urls = S.vods.filter(v => (!$("#vGta").checked || v.gta) && v.state === "nouvelle" && !v.last_error).map(v => v.url);
+  if (!urls.length) return toast("Aucune nouvelle vidéo à analyser");
+  const r = await api("/api/analyze", {urls}); toast(r.queued + " vidéo(s) en file d'analyse"); refresh(); };
+
+function doneState(n, sid){  // vidéo analysée : ce qui reste à trier
+  return {state: n.new ? `<span class="ok">prête : ${nClips(n.new)} à trier</span>` : `<span class="ok">✓ faite · ${n.kept} gardé(s)</span>`,
+    acts: sid ? `<button data-see="${esc(sid)}">Voir</button>` : ""};
+}
+function vodRow(v){
+  const r = {thumb:v.thumb, who:v.streamer, title:v.title, url:v.url, day:v.day || "today",
+    t: v.ended ? v.ended * 1000 : Date.now() - (v.age_h || 0) * 36e5, todo: v.state !== "analysée"};
+  r.meta = [esc(v.platform), fmt(v.duration), ago((Date.now() - r.t) / 36e5)].filter(Boolean).join(" · ");
+  if (!r.todo) {
+    Object.assign(r, doneState(v.counts, v.clips ? v.source_id : ""), {rank:9});
+    r.acts += `<button class="ghost small" data-an="${esc(v.url)}" title="Relancer l'analyse de cette vidéo">Réanalyser</button>`;
+  } else if (v.state === "nouvelle" && v.last_error) {
+    Object.assign(r, {rank:3, state:`<span class="err" title="${esc(v.last_error)}">échec : ${esc(shortErr(v.last_error))}</span>`,
+      acts:`<button data-an="${esc(v.url)}">Réessayer</button>`});
+  } else if (v.state === "nouvelle") {
+    Object.assign(r, {rank:0, state:"<span>à analyser</span>", acts:`<button class="primary" data-an="${esc(v.url)}">Analyser</button>`});
+  } else if (v.state === "en attente") {
+    Object.assign(r, {rank:1, state:`<span class="warn">en file</span>`, acts:""});
+  } else {
+    const w = stepWord(v.state === "finalisation" ? "Claude" : v.step);
+    Object.assign(r, {rank:2, acts:"", state:`<span class="run">en cours${v.machine ? " chez " + esc(v.machine) : ""}${w ? " · " + w : ""}</span>`});
+  }
+  return r;
+}
+function handRows(vodUrls){  // vidéos ajoutées à la main : en cours (tâche) puis prêtes (source avec des extraits)
+  const out = [], n = {};
+  for (const c of S.clips) { const x = n[c.source_id] = n[c.source_id] || {new:0, kept:0, trash:0, thumb:""}; x[c.status]++; x.thumb = x.thumb || c.thumb; }
+  for (const j of S.jobs) {
+    if (j.kind !== "collect" || j.status === "terminé" || vodUrls.has(j.label)) continue;
+    const step = (j.lines.slice().reverse().find(l => l.includes("▶ ")) || "").split("▶ ")[1];
+    const err = (j.lines.find(l => /ERREUR :/.test(l)) || "").split("ERREUR :")[1] || "";
+    out.push({who:"Vidéo ajoutée", title:j.label, url:/^https?:\/\//.test(j.label) ? j.label : "", meta:ago(hoursSince(j.created)),
+      day:dayOf(j.created), t:+dateOf(j.created), todo:true, acts:"",
+      rank: j.status === "erreur" ? 3 : j.status === "en attente" ? 1 : 2,
+      state: j.status === "erreur" ? `<span class="err" title="${esc(err)}">échec : ${esc(shortErr(err))}</span>`
+        : j.status === "en attente" ? `<span class="warn">en file</span>` : `<span class="run">en cours${stepWord(step) ? " · " + stepWord(step) : ""}</span>`});
+  }
+  for (const s of S.sources) {
+    const k = n[s.id]; if (!s.added_by || !k || vodUrls.has(s.url)) continue;
+    out.push({who:s.streamer || "?", title:s.title, url:s.url, thumb:k.thumb ? "/files/" + k.thumb : "", day:dayOf(s.added),
+      t:+dateOf(s.added), todo:false, rank:9, meta:"ajoutée par " + esc(s.added_by) + " · " + ago(hoursSince(s.added)), ...doneState(k, s.id)});
+  }
+  return out;
+}
+const rowHTML = r => `<div class="item vrow">
+    ${r.thumb ? `<img src="${esc(r.thumb)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<div class="nothumb"></div>`}
+    <div class="t">
+      <div><b>${esc(r.who)}</b> <span class="muted small">${r.meta}</span></div>
+      <div class="small muted" title="${esc(r.title)}">${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title || "(sans titre)")}</a>` : esc(r.title || "")}</div>
+    </div>
+    <div class="state">${r.state}</div>
+    <div class="acts">${r.acts}</div></div>`;
+function renderVods(){
+  const gta = $("#vGta").checked, vodUrls = new Set(S.vods.map(v => v.url));
+  const vs = S.vods.filter(v => !gta || v.gta), hidden = S.vods.length - vs.length;
+  const all = [...vs.map(vodRow), ...handRows(vodUrls)];
+  const rows = all.filter(r => vFilt === "all" || (vFilt === "todo") === r.todo);
+  const scanning = S.jobs.some(j => j.kind === "scan" && /attente|cours/.test(j.status));
+  $("#vUpd").textContent = scanning ? "Recherche en cours…" : S.vods_scan ? "mise à jour " + ago(hoursSince(S.vods_scan)) : "";
+  $("#vAll").hidden = !vs.some(v => v.state === "nouvelle" && !v.last_error);
+  $$("#vFilt [data-f]").forEach(b => b.classList.toggle("on", b.dataset.f === vFilt));
+  const byT = (a, b) => b.t - a.t;
+  $("#vList").innerHTML = DAYS.map(([d, label]) => {
+    const rs = rows.filter(r => r.day === d); if (!rs.length) return "";
+    const todo = rs.filter(r => r.todo).sort((a, b) => a.rank - b.rank || byT(a, b)), done = rs.filter(r => !r.todo).sort(byT);
+    return `<div class="dgroup"><h3>${label} <span class="muted small">${todo.length} à faire · ${done.length} faite(s)</span></h3>
+      ${todo.length && done.length ? `<div class="sub">À faire</div>` : ""}<div class="list">${todo.map(rowHTML).join("")}</div>
+      ${todo.length && done.length ? `<div class="sub">Faites</div>` : ""}<div class="list">${done.map(rowHTML).join("")}</div></div>`;
+  }).join("") || `<div class="empty">${scanning ? "Recherche des vidéos…" : vFilt === "todo" ? "Rien à faire : tout est analysé."
+    : vFilt === "done" ? "Aucune vidéo analysée pour l'instant." : "Aucune vidéo de moins de 24 h" + (hidden ? " sur GTA (décoche « GTA uniquement » pour tout voir)" : "")
+    + ". Vérifie la liste des streamers suivis (onglet Streamers)."}</div>`;
+  $$("#vList [data-an]").forEach(b => b.onclick = async () => { await api("/api/analyze", {urls:[b.dataset.an]}); toast("Analyse lancée"); refresh(); });
+  $$("#vList [data-see]").forEach(b => b.onclick = () => openVod(b.dataset.see));
+}
+
+/* ---------------- streamers suivis ---------------- */
 function renderFollow(){
   const F = S.follow; if ($("#fBox").contains(document.activeElement) && document.activeElement.type === "text") return;
   $("#fCount").textContent = `(${F.streamers.filter(s => s.on).length} actifs sur ${F.streamers.length})`;
-  $("#fList").innerHTML = F.streamers.map((s,i) => `<label class="st" style="padding:4px 8px;display:inline-flex;gap:6px;align-items:center">
+  $("#fList").innerHTML = F.streamers.map((s,i) => `<label>
     <input type="checkbox" data-fi="${i}" ${s.on ? "checked" : ""}> ${esc(s.name)} <span class="muted">${s.platform === "twitch" ? "Twitch" : s.platform === "youtube" ? "YT" : "Kick"}${s.lang ? " · " + esc(s.lang) : ""}</span>
     <a href="#" data-fx="${i}" title="Retirer">✕</a></label>`).join("");
   $$("[data-fi]").forEach(c => c.onchange = () => { F.streamers[+c.dataset.fi].on = c.checked; saveFollow(); });
@@ -520,7 +940,7 @@ function renderFollow(){
 }
 async function saveFollow(){
   S.follow = await api("/api/follow", {streamers:S.follow.streamers});
-  renderFollow(); toast("Liste enregistrée : clique « Actualiser » pour relancer la recherche");
+  renderFollow(); toast("Liste enregistrée : clique « Actualiser » dans Vidéos pour relancer la recherche");
 }
 $("#fAdd").onclick = () => {
   const h = $("#fH").value.trim(); if (!h) return toast("Indique le pseudo de la chaîne");
@@ -535,30 +955,34 @@ $("#fAdd").onclick = () => {
   S.follow.streamers.unshift({platform:$("#fP").value, handle:h, name:$("#fName").value.trim() || h.replace(/^@/, ""), lang:"", on:true});
   $("#fH").value = $("#fName").value = ""; saveFollow();
 };
-$("#cFile").onchange = async e => {
-  const f = e.target.files[0]; if (!f) return;
-  toast("Envoi de " + f.name + "…");
-  const q = new URLSearchParams({name:f.name, max:S.settings.max_moments, window:"", streamer:$("#cStr").value});
-  const r = await fetch("/api/upload?" + q, {method:"POST", body:f, headers:{"X-User":encodeURIComponent(me)}});
-  if (r.ok) toast("Fichier reçu, analyse lancée"); else toast("Échec de l'envoi");
-  e.target.value = ""; refresh();
-};
-const openJobs = new Set();
-async function renderJobs(){
-  const el = $("#jobs");
-  if (!S.jobs.length){ el.innerHTML = "Aucune tâche."; return; }
-  const full = {};
-  for (const id of openJobs) { try { full[id] = await api("/api/job/" + id); } catch(e){} }
-  el.innerHTML = S.jobs.map(j => `<div class="job">
-    <div class="row"><span class="st ${esc(j.status)}">${esc(j.status)}</span><b>${j.kind==="export"?"Export":j.kind==="scan"?"Recherche":j.kind==="finish"?"Finalisation":"Analyse"}</b>
-    <span class="muted" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(j.label)}</span>
-    <a href="#" data-j="${j.id}">${openJobs.has(j.id)?"réduire":"journal complet"}</a></div>
-    <pre>${esc((full[j.id]||j).lines.join("\n"))}</pre></div>`).join("");
-  el.querySelectorAll("[data-j]").forEach(a => a.onclick = e => { e.preventDefault(); const id=a.dataset.j;
-    openJobs.has(id)?openJobs.delete(id):openJobs.add(id); renderJobs(); });
+
+/* ---------------- autorisations (sources) ---------------- */
+let srcEdit = null;
+const shortUrl = u => String(u || "").replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
+function renderSources(){
+  const t = $("#srcT"), a = document.activeElement;
+  if (a && t.contains(a) && /^(INPUT|SELECT)$/.test(a.tagName)) return;  // ne pas effacer une saisie en cours
+  const cnt = id => S.clips.filter(c => c.source_id === id && c.status === "kept").length;
+  t.innerHTML = `<tr><th>Streamer</th><th>Vidéo</th><th>Autorisation</th><th>Crédits</th><th>Gardés</th></tr>` +
+    S.sources.slice().sort((a,b) => b.added.localeCompare(a.added)).map(s => `<tr data-s="${s.id}">
+      <td><b>${esc(s.streamer || "?")}</b></td>
+      <td class="small">${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title || "(sans titre)")}</a>` : esc(s.title || "")}
+        <div class="muted">${esc(s.platform || "")} · ${esc((s.added || "").slice(0, 10))}</div></td>
+      <td><select data-k="auth">${S.auth.map(a => `<option ${a===s.auth?"selected":""}>${esc(a)}</option>`).join("")}</select></td>
+      <td class="small">${srcEdit === s.id
+        ? `<div class="row"><input type="text" data-k="streamer" value="${esc(s.streamer)}" placeholder="nom" style="width:130px">
+           <input type="text" data-k="streamer_url" value="${esc(s.streamer_url)}" placeholder="lien de la chaîne" style="width:220px">
+           <button class="small" data-done>OK</button></div>`
+        : `${s.streamer_url ? `<a href="${esc(s.streamer_url)}" target="_blank" rel="noopener">${esc(shortUrl(s.streamer_url))}</a>` : `<span class="muted">aucun lien</span>`}
+           · <a href="#" data-edit="${s.id}">modifier</a>`}</td>
+      <td>${cnt(s.id)}</td></tr>`).join("");
+  t.querySelectorAll("[data-k]").forEach(i => i.onchange = async () => {
+    await api("/api/source/" + i.closest("tr").dataset.s, {[i.dataset.k]: i.value}); toast("Enregistré"); refresh(); });
+  t.querySelectorAll("[data-edit]").forEach(a => a.onclick = e => { e.preventDefault(); srcEdit = a.dataset.edit; renderSources(); });
+  t.querySelectorAll("[data-done]").forEach(b => b.onclick = () => { srcEdit = null; renderSources(); });
 }
 
-/* Machines (moteurs) */
+/* ---------------- machines, réglages, journal ---------------- */
 const ASK = {stop_now: n => `Arrêter « ${n} » maintenant ? Les fichiers en cours repartent en file.`,
   remove: n => `Retirer « ${n} » ? Sa ligne d'installation ne marchera plus.`};
 const mBtn = (m, action, label) => `<button class="small" data-mc="${action}" data-mn="${esc(m.name)}">${label}</button>`;
@@ -567,14 +991,16 @@ const fillIn = (el, v) => { v = v || ""; if (el.dataset.v !== v && document.acti
 function renderMachines(){
   const M = S.machines || [], C = S.engine_conf || {}, now = Date.now() / 1000;
   fillIn($("#maUrl"), C.public_url); fillIn($("#maGit"), C.github); fillIn($("#maInv"), C.invite);
+  $("#sAi").checked = S.settings.ai !== false;
+  if (document.activeElement !== $("#sMax")) $("#sMax").value = S.settings.max_moments;
   $("#maList").innerHTML = M.length ? M.map(m => `<div class="job">
     <div class="row"><b>${esc(m.name)}</b>${m.local ? `<span class="muted">· ce PC</span>` : ""}
-      ${m.online ? `<span style="color:var(--ok)">● en ligne</span>`
+      ${m.online ? `<span class="ok">● en ligne</span>`
         : `<span class="muted">○ hors ligne (${m.last_seen ? "vu " + ago((now - m.last_seen) / 3600) : "jamais connectée"})</span>`}
       <span class="st">${m.paused ? (m.jobs.length ? "en pause après les fichiers en cours" : "en pause") : "actif"}</span></div>
     <div class="muted">${[m.os, m.gpu].filter(Boolean).map(esc).join(" · ")}</div>
-    ${m.version && !m.version_ok ? `<div style="color:var(--warn)">⚠ version différente : relance le moteur</div>` : ""}
-    ${m.paused && m.reason ? `<div style="color:var(--warn)">⚠ ${esc(m.reason)}</div>` : ""}
+    ${m.version && !m.version_ok ? `<div class="warn">⚠ version différente : relance le moteur</div>` : ""}
+    ${m.paused && m.reason ? `<div class="warn">⚠ ${esc(m.reason)}</div>` : ""}
     ${m.jobs.map(j => `<div style="margin-top:4px">▶ <b>${esc(j.streamer)}</b> ${esc(j.title || j.url)}
       <div class="muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(j.line)}">${esc(j.step || "démarrage")}${
         j.line ? " · " + esc(j.line) : ""}${j.started ? " · depuis " + fmt(now - j.started) : ""}</div></div>`).join("")}
@@ -626,32 +1052,47 @@ $("#maAdd").onclick = async () => {
   showMsg(r);
   refresh();
 };
+$("#sAi").onchange = async () => { S.settings = await api("/api/settings", {ai:$("#sAi").checked});
+  toast($("#sAi").checked ? "IA activée : Claude choisit les moments" : "IA désactivée : sélection automatique"); };
+$("#sMax").onchange = async () => { const n = parseInt($("#sMax").value, 10); if (!(n >= 1 && n <= 50)) return;
+  S.settings = await api("/api/settings", {max_moments:n}); toast(n + " extraits max par vidéo"); };
+const openJobs = new Set();
+async function renderJobs(){
+  const el = $("#jobs");
+  if (!S.jobs.length){ el.innerHTML = "Aucune tâche."; return; }
+  const full = {};
+  for (const id of openJobs) { try { full[id] = await api("/api/job/" + id); } catch(e){} }
+  el.innerHTML = S.jobs.map(j => `<div class="job">
+    <div class="row"><span class="st ${esc(j.status)}">${esc(j.status)}</span><b>${j.kind==="export"?"Export":j.kind==="scan"?"Recherche":j.kind==="finish"?"Finalisation":"Analyse"}</b>
+    <span class="muted" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(j.label)}</span>
+    <a href="#" data-j="${esc(j.id)}">${openJobs.has(j.id)?"réduire":"journal complet"}</a></div>
+    <pre>${esc((full[j.id]||j).lines.join("\n"))}</pre></div>`).join("");
+  el.querySelectorAll("[data-j]").forEach(a => a.onclick = e => { e.preventDefault(); const id=a.dataset.j;
+    openJobs.has(id)?openJobs.delete(id):openJobs.add(id); renderJobs(); });
+}
 
 /* ---------------- tri ---------------- */
 let cur = null, sel = {cat:null, rating:null, flags:{}}, hist = [], skip = new Set(), loading = false;
-const tv = $("#tv");
-
-/* volume : 25 % par défaut, mémorisé, appliqué au tri et à la fenêtre de réglage */
-let vol = (() => { const v = store.get("bo_vol"); return v === null || isNaN(+v) ? 25 : +v; })(), muted = false;
-function applyVol(){
-  vol = Math.max(0, Math.min(100, Math.round(vol / 5) * 5)); store.set("bo_vol", vol);
-  for (const v of [tv, $("#mv"), $("#pv")]) { v.volume = vol / 100; v.muted = muted || vol === 0; }
-  $("#tVol").value = vol; $("#tVolV").textContent = vol + " %";
-  $("#tMute").textContent = muted || vol === 0 ? "🔇" : vol < 40 ? "🔉" : "🔊";
-}
-function setVol(v){ vol = v; muted = false; applyVol(); }
-$("#tVol").oninput = e => setVol(+e.target.value);
-$("#tMute").onclick = () => { muted = !muted; applyVol(); };
+let triDay = store.get("bo_day") || "", days = null;
+const tEd = makeEditor($("#tEd"), true, $("#tTools"));
 $("#tcats").innerHTML = CATS.map((c,i) => `<button data-c="${c}">${c}<small>${CAT_HINT[c]} · ${["Q","S","D","F"][i]}</small></button>`).join("");
-$("#trate").innerHTML = [1,2,3,4,5].map(n => `<button data-r="${n}" title="${n}/5">${"★".repeat(n)}</button>`).join("");
+$("#trate").innerHTML = [1,2,3,4,5].map(n => `<button data-r="${n}" title="${n}/5">★<small>${n}</small></button>`).join("");
 $$("#tcats button").forEach(b => b.onclick = () => chooseCat(b.dataset.c));
 $$("#trate button").forEach(b => b.onclick = () => chooseRating(+b.dataset.r));
 $$("#tflags input").forEach(i => i.onchange = () => { sel.flags[i.dataset.f] = i.checked; });
 
+function renderDays(){
+  if (!days) { $("#tDays").innerHTML = ""; return; }
+  const all = DAYS.reduce((a, [d]) => a + (days[d] || 0), 0);
+  $("#tDays").innerHTML = [...DAYS, ["", "Tout"]].map(([d, l]) =>
+    `<button class="chip${d === triDay ? " on" : ""}" data-day="${d}">${l} <span class="n">${d ? days[d] || 0 : all}</span></button>`).join("");
+  $$("#tDays [data-day]").forEach(b => b.onclick = () => { triDay = b.dataset.day; store.set("bo_day", triDay); cur = null; renderDays(); loadNext(); });
+}
 async function loadNext(){
   if (loading) return; loading = true;
   try {
-    const r = await api("/api/next?skip=" + [...skip].join(","));
+    const r = await api("/api/next?skip=" + [...skip].join(",") + (triDay ? "&day=" + triDay : ""));
+    days = r.days || null; renderDays();
     showClip(r.clips[0] || null, r.remaining);
     r.clips.slice(1).forEach(c => { const v = document.createElement("video"); v.preload = "auto"; v.muted = true; v.src = "/files/" + c.file; });
   } finally { loading = false; }
@@ -661,30 +1102,27 @@ function showClip(c, remaining){
   $$("#tflags input").forEach(i => i.checked = false);
   updateTriButtons();
   if (!c){
-    tv.removeAttribute("src"); tv.load();
+    tEd.clear();
+    const other = days && triDay ? DAYS.reduce((a, [d]) => a + (d !== triDay ? days[d] || 0 : 0), 0) : 0;
     $("#tmeta").className = "empty";
     $("#tmeta").innerHTML = skip.size ? `Plus rien à trier, sauf ${skip.size} extrait(s) mis de côté. <br><br><button id="tAgain">Les revoir</button>`
-      : "Rien à trier pour l'instant.<br>Lance une analyse dans l'onglet Collecte.";
+      : other ? `Plus rien à trier pour ce jour-là.<br>Il en reste ${other} ailleurs : choisis « Tout » au-dessus.`
+      : "Rien à trier pour l'instant.<br>Ajoute une vidéo dans l'onglet Vidéos.";
     const again = $("#tAgain"); if (again) again.onclick = () => { skip.clear(); loadNext(); };
     $("#tflags").hidden = true; return;
   }
-  const s = c.source || {};
+  const s = c.source || {}, by = addedBy(c);
   $("#tmeta").className = "";
   $("#tmeta").innerHTML = `<h2 style="margin:0">${esc(s.streamer || "?")}</h2>
     <div class="small muted">${esc(s.title || "")}</div>
-    ${c.ai && c.ai.category ? `<div class="why" style="border:1px dashed var(--accent)">🤖 Claude propose
-      <span class="cat ${c.ai.category}">${c.ai.category}</span> <span class="stars">${stars(c.ai.rating)}</span>
+    <div class="small" style="margin-top:6px">à ${fmt(c.src_start + segsOf(c)[0][0])} dans la VOD${s.url ? ` · <a href="${esc(s.url)}" target="_blank" rel="noopener">voir la vidéo d'origine</a>` : ""}</div>
+    ${by ? `<div class="why">${esc(by)}</div>` : ""}
+    ${c.ai && c.ai.category ? `<div class="why suggest">Claude propose
+      <span class="cat ${esc(c.ai.category)}">${esc(c.ai.category)}</span> <span class="stars">${stars(c.ai.rating)}</span>
       <div class="small">${esc(c.ai.reason || "")}</div><div class="small muted"><kbd>Entrée</kbd> pour valider sa proposition</div></div>` : ""}
-    <div class="why">${esc((c.why || "").replace(/^IA : [^·]*· /, ""))}</div>
-    <div class="small muted">Durée ${fmt1(dur(c))} · à ${fmt(c.src_start + c.in)} dans la VOD · score ${c.score}
-    · <a href="${esc(s.url || "#")}" target="_blank" rel="noopener">source</a></div>
-    <div class="small muted" style="margin-top:6px">${remaining} à trier</div>`;
+    <div class="small muted" style="margin-top:6px">${esc(remaining)} à trier</div>`;
   $("#tflags").hidden = false;
-  tv.src = "/files/" + c.file;
-  tv.currentTime = c.in;
-  applyVol();
-  tv.play().catch(() => { tv.muted = true; tv.play().catch(()=>{}); });  // le navigateur bloque le son avant le 1er clic
-  drawBar();
+  tEd.load(c, true);
 }
 function updateTriButtons(){
   $$("#tcats button").forEach(b => b.classList.toggle("on", b.dataset.c === sel.cat));
@@ -696,7 +1134,7 @@ function chooseCat(c){ if (!cur) return; sel.cat = c; updateTriButtons(); if (se
 function chooseRating(n){ if (!cur) return; sel.rating = n; updateTriButtons(); if (sel.cat) commit(); else toast("Choisis aussi une catégorie"); }
 async function commit(){
   const c = cur; if (!c) return; cur = null;
-  await api("/api/clip/" + c.id, {status:"kept", category:sel.cat, rating:sel.rating, flags:sel.flags, in:c.in, out:c.out});
+  await api("/api/clip/" + c.id, {status:"kept", category:sel.cat, rating:sel.rating, flags:sel.flags, segs:tEd.segs});
   hist.push(c.id); toast(`${sel.cat} ${"★".repeat(sel.rating)} — gardé`); loadNext(); refreshSoon();
 }
 async function trash(){ const c = cur; if (!c) return; cur = null;
@@ -707,66 +1145,27 @@ async function undo(){
   const c = await api("/api/clip/" + id, {status:"new"});
   c.source = src(c); showClip(c, "?"); refreshSoon();
 }
-function setEdge(which){
-  if (!cur) return; const t = tv.currentTime;
-  if (which === "in" && t < cur.out - .5) cur.in = +t.toFixed(2);
-  if (which === "out" && t > cur.in + .5) cur.out = +t.toFixed(2);
-  drawBar(); toast(which === "in" ? "Début réglé" : "Fin réglée");
-}
 $("#tTrash").onclick = trash; $("#tLater").onclick = later; $("#tUndo").onclick = undo;
-$("#tIn").onclick = () => setEdge("in"); $("#tOut").onclick = () => setEdge("out");
-function drawBar(){
-  if (!cur || !cur.file_dur) return;
-  const D = cur.file_dur;
-  $("#twin").style.left = (cur.in/D*100) + "%"; $("#twin").style.width = ((cur.out-cur.in)/D*100) + "%";
-  $("#tpos").style.left = (tv.currentTime/D*100) + "%";
-  $("#tInV").textContent = fmt1(cur.in); $("#tOutV").textContent = fmt1(cur.out); $("#tDurV").textContent = fmt1(cur.out - cur.in);
-}
-function nudge(which, d){
-  if (!cur) return;
-  if (which === "in") { cur.in = Math.max(0, Math.min(cur.out - 1, +(cur.in + d).toFixed(2))); tv.currentTime = cur.in; }
-  else { cur.out = Math.min(cur.file_dur, Math.max(cur.in + 1, +(cur.out + d).toFixed(2))); tv.currentTime = Math.max(cur.in, cur.out - 3); }
-  drawBar();
-}
-$$("[data-tn]").forEach(b => b.onclick = () => nudge(b.dataset.tn, +b.dataset.d));
-tv.onended = () => { if (cur) { tv.currentTime = cur.in; tv.play().catch(()=>{}); } };  // idem dans le Tri : on reboucle
-tv.ontimeupdate = () => { if (cur && !dragEdge && (tv.currentTime >= cur.out || tv.currentTime < cur.in - .3)) { tv.currentTime = cur.in; } drawBar(); };
-/* barre : clic = se placer ; attraper un bord rose = régler début / fin */
-let dragEdge = null;
-$("#tbar").style.height = "14px";
-$("#tbar").onpointerdown = e => {
-  if (!cur) return;
-  const r = e.currentTarget.getBoundingClientRect(), t = (e.clientX - r.left)/r.width*cur.file_dur, tol = cur.file_dur * 12 / r.width;
-  dragEdge = Math.abs(t - cur.in) <= tol ? "in" : Math.abs(t - cur.out) <= tol ? "out" : null;
-  if (dragEdge) { e.currentTarget.setPointerCapture(e.pointerId); tv.pause(); } else tv.currentTime = t;
-};
-$("#tbar").onpointermove = e => {
-  const r = e.currentTarget.getBoundingClientRect();
-  if (!cur) return;
-  const t = Math.max(0, Math.min(cur.file_dur, (e.clientX - r.left)/r.width*cur.file_dur)), tol = cur.file_dur * 12 / r.width;
-  e.currentTarget.style.cursor = dragEdge || Math.abs(t - cur.in) <= tol || Math.abs(t - cur.out) <= tol ? "ew-resize" : "pointer";
-  if (!dragEdge) return;
-  if (dragEdge === "in") cur.in = +Math.min(t, cur.out - 1).toFixed(2); else cur.out = +Math.max(t, cur.in + 1).toFixed(2);
-  tv.currentTime = dragEdge === "in" ? cur.in : cur.out; drawBar();
-};
-$("#tbar").onpointerup = () => { if (dragEdge) { const w = dragEdge; dragEdge = null;
-  tv.currentTime = w === "in" ? cur.in : Math.max(cur.in, cur.out - 3); tv.play().catch(()=>{}); } };
 
 document.addEventListener("keydown", e => {
-  if (view !== "tri" || !$("#mTrim").hidden || !$("#mName").hidden || !$("#mVod").hidden) return;
-  if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) && e.target.type !== "checkbox") return;
+  if (!$("#mName").hidden) return;
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) && !/^(checkbox|range)$/.test(e.target.type)) return;
   if (e.ctrlKey || e.metaKey || e.altKey) return;
-  const k = e.key.toLowerCase();
+  const k = e.key.toLowerCase(), run = f => { e.preventDefault(); f(); };
+  if (k === "escape") { const m = ["#mTrim", "#mPrev", "#mVod"].find(s => !$(s).hidden); if (m) $(m + " .head button").click(); return; }
+  if (!$("#mTrim").hidden) { if (mEd.key(k)) e.preventDefault(); else if (VOL_KEYS[k]) run(VOL_KEYS[k]); return; }
+  if (!$("#mPrev").hidden) { const f = {" ": pvToggle, arrowleft: () => pvSeek(pvDone() - 3), arrowright: () => pvSeek(pvDone() + 3)}[k] || VOL_KEYS[k];
+    if (f) run(f); return; }
+  if (!$("#mVod").hidden || view !== "tri") return;
   if (k === "enter" && cur && cur.ai && cur.ai.category) {  // valide la proposition de Claude (catégorie + note)
     e.preventDefault(); sel.cat = cur.ai.category; sel.rating = sel.rating || cur.ai.rating || 3; return commit(); }
   if (CAT_KEYS[k]) return chooseCat(CAT_KEYS[k]);
   if (DIGIT[e.code]) return chooseRating(DIGIT[e.code]);
-  const map = {x:trash, z:undo, backspace:undo, arrowdown:later, "[":()=>setEdge("in"), "]":()=>setEdge("out"), i:()=>setEdge("in"), o:()=>setEdge("out"),
-    " ":()=> tv.paused ? tv.play() : tv.pause(), arrowleft:()=> tv.currentTime -= 3, arrowright:()=> tv.currentTime += 3,
-    m:()=> { muted = !muted; applyVol(); }, "+":()=> setVol(vol + 5), "=":()=> setVol(vol + 5), "-":()=> setVol(vol - 5)};
   const fl = {r:"radio", c:"cinematic", v:"violence"}[k];
   if (fl && cur){ e.preventDefault(); const i = $(`#tflags input[data-f=${fl}]`); i.checked = !i.checked; sel.flags[fl] = i.checked; return; }
-  if (map[k]) { e.preventDefault(); map[k](); }
+  const f = {x:trash, z:undo, backspace:undo, arrowdown:later}[k] || VOL_KEYS[k];
+  if (f) return run(f);
+  if (cur && tEd.key(k)) e.preventDefault();
 });
 let rsT = null, dragging = false, tick = 0; function refreshSoon(){ clearTimeout(rsT); rsT = setTimeout(refresh, 400); }
 
@@ -778,20 +1177,20 @@ const projItems = () => S.project.items.map(id => S.clips.find(c => c.id === id)
 async function saveProject(body){ S.project = await api("/api/project", body); refresh(); }
 
 function itemHTML(c, i, inProj){
-  const s = src(c), fl = c.flags || {};
+  const s = src(c), fl = c.flags || {}, n = segsOf(c).length;
   const tags = [fl.radio?"🎵 radio":"", fl.cinematic?"🎬 cinématique":"", fl.violence?"🩸 violence":""].filter(Boolean).join(" · ");
-  return `<div class="item" data-id="${c.id}" ${inProj?'draggable="true"':""}>
+  return `<div class="item" data-id="${esc(c.id)}" ${inProj?'draggable="true"':""}>
     ${inProj ? `<span class="row" style="gap:2px"><span class="handle" title="Glisser pour déplacer">⋮⋮</span><span class="num">${i+1}</span></span>` : "<span></span>"}
-    <img src="${c.thumb ? "/files/" + c.thumb : ""}" alt="" data-open="${c.id}" loading="lazy">
-    <div class="t">
-      <div>${c.category ? `<span class="cat ${c.category}">${c.category}</span>` : ""} <span class="stars">${stars(c.rating)}</span>
-        <b>${esc(s.streamer || "?")}</b> <span class="muted">${fmt1(dur(c))}</span></div>
-      <div class="small muted" title="${esc(c.why)}">${tags ? tags + " · " : ""}${esc(c.why || "")}${c.used_in ? " · utilisé dans " + esc(c.used_in) : ""}</div>
+    <img src="${c.thumb ? "/files/" + esc(c.thumb) : ""}" alt="" data-open="${esc(c.id)}" loading="lazy" title="Regarder / régler">
+    <div class="t" data-open="${esc(c.id)}" title="Regarder / régler">
+      <div>${c.category ? `<span class="cat ${esc(c.category)}">${esc(c.category)}</span>` : ""} <span class="stars">${stars(c.rating)}</span>
+        <b>${esc(s.streamer || "?")}</b> <span class="muted">${fmt1(dur(c))}${n > 1 ? " · " + n + " morceaux" : ""}</span></div>
+      <div class="small muted">${tags ? tags + " · " : ""}${esc(whyText(c))}${c.used_in ? " · utilisé dans " + esc(c.used_in) : ""}</div>
     </div>
     <div class="acts">${inProj
-      ? `<button data-up="${c.id}" title="Monter">↑</button><button data-down="${c.id}" title="Descendre">↓</button><button data-rm="${c.id}" title="Retirer">✕</button>`
-      : c.status === "trash" ? `<button data-restore="${c.id}">Remettre à trier</button>`
-      : `<button data-add="${c.id}" title="Ajouter au best-of">＋</button>`}</div></div>`;
+      ? `<button data-up="${esc(c.id)}" title="Monter">↑</button><button data-down="${esc(c.id)}" title="Descendre">↓</button><button data-rm="${esc(c.id)}" title="Retirer">✕</button>`
+      : c.status === "trash" ? `<button data-restore="${esc(c.id)}">Remettre à trier</button>`
+      : `<button data-add="${esc(c.id)}" title="Ajouter au best-of">＋</button>`}</div></div>`;
 }
 function renderBestof(){
   const pj = S.project, items = projItems();
@@ -819,10 +1218,10 @@ function renderBestof(){
 
   $("#exps").innerHTML = S.exports.length ? S.exports.map(x => `<div class="job"><b>${esc(x.project)}</b>
     <span class="muted">${esc(x.created)} · ${fmt(x.dur)}</span><div class="row" style="margin-top:4px">
-    <a href="/files/${x.files.mp4}?dl=1">Vidéo MP4</a><a href="/files/${x.files.mp4}" target="_blank">regarder</a>
-    <a href="/files/${x.files.fcpxml}?dl=1">Timeline DaVinci (.fcpxml)</a>
-    <a href="/files/${x.files.description}" target="_blank">Description YouTube</a>
-    <a href="/files/${x.files.csv}?dl=1">Sources (CSV)</a></div>
+    <a href="/files/${esc(x.files.mp4)}?dl=1">Vidéo MP4</a><a href="/files/${esc(x.files.mp4)}" target="_blank">regarder</a>
+    <a href="/files/${esc(x.files.fcpxml)}?dl=1">Timeline DaVinci (.fcpxml)</a>
+    <a href="/files/${esc(x.files.description)}" target="_blank">Description YouTube</a>
+    <a href="/files/${esc(x.files.csv)}?dl=1">Sources (CSV)</a></div>
     <div class="muted">Dossier : data/${esc(x.dir)}</div></div>`).join("")
     : `<span class="muted">Aucun export. Le MP4 et la timeline DaVinci (avec les segments) apparaîtront ici.</span>`;
   const run = S.jobs.find(j => j.kind === "export" && /attente|cours/.test(j.status));
@@ -839,7 +1238,7 @@ function wireLists(){
   $$("[data-up],[data-down]").forEach(b => b.onclick = () => {
     const a = ids(), id = b.dataset.up || b.dataset.down, i = a.indexOf(id), j = i + (b.dataset.up ? -1 : 1);
     if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; saveProject({items:a}); });
-  $$("[data-open]").forEach(im => im.onclick = () => openTrim(im.dataset.open));
+  $$("#v-bestof [data-open]").forEach(im => im.onclick = () => openTrim(im.dataset.open));
   let dragId = null;
   $$("#proj .item").forEach(el => {
     el.ondragstart = e => { dragging = true; dragId = el.dataset.id; el.classList.add("drag"); e.dataTransfer.effectAllowed = "move"; };
@@ -868,71 +1267,69 @@ $("#pExport").onclick = async () => { await api("/api/export", {}); toast("Expor
 $("#sFps").onchange = $("#sLower").onchange = async () => {
   S.settings = await api("/api/settings", {fps:$("#sFps").value, lower_third:$("#sLower").checked}); toast("Réglage enregistré"); };
 
-/* ---------------- modale réglage extrait ---------------- */
-let mc = null; const mv = $("#mv");
-$("#mCat").innerHTML = CATS.map(c => `<option>${c}</option>`).join("");
+/* ---------------- fenêtre de réglage d'un extrait (Best-of, extraits d'une VOD) ---------------- */
+let mc = null;
+const mEd = makeEditor($("#mEd"), false);
+$("#mCat").innerHTML += CATS.map(c => `<option>${c}</option>`).join("");
 function openTrim(id){
   const c = S.clips.find(x => x.id === id); if (!c) return;
-  mc = {...c, flags:{...(c.flags||{})}};
-  $("#mTitle").textContent = (src(c).streamer || "?") + " — " + (c.why || "");
-  $("#mCat").value = c.category || "FUN";
-  mv.src = "/files/" + c.file; mv.currentTime = c.in;
-  $("#mTrim").hidden = false; drawM();
+  mc = {...c};
+  $("#mTitle").textContent = (src(c).streamer || "?") + (whyText(c) ? " — " + whyText(c) : "");
+  $("#mCat").value = c.category || "";
+  $("#mTrim").hidden = false; drawStars(); mEd.load(c, true);
 }
-function drawM(){
-  if (!mc) return; const D = mc.file_dur;
-  $("#mwin").style.left = (mc.in/D*100)+"%"; $("#mwin").style.width = ((mc.out-mc.in)/D*100)+"%";
-  $("#mpos").style.left = (mv.currentTime/D*100)+"%";
-  $("#mInV").textContent = fmt1(mc.in); $("#mOutV").textContent = fmt1(mc.out); $("#mDur").textContent = fmt1(mc.out-mc.in);
+function drawStars(){
   $("#mStars").innerHTML = [1,2,3,4,5].map(n => `<span data-s="${n}" class="${n <= (mc.rating||0) ? "on" : ""}">★</span>`).join("");
-  $$("#mStars span").forEach(s => s.onclick = () => { mc.rating = +s.dataset.s; drawM(); });
+  $$("#mStars span").forEach(s => s.onclick = () => { mc.rating = +s.dataset.s; drawStars(); });
 }
-mv.ontimeupdate = () => { if (mc && mv.dataset.clip && mv.currentTime >= mc.out) { mv.pause(); delete mv.dataset.clip; } drawM(); };
-$("#mbar").onclick = e => { const r = e.currentTarget.getBoundingClientRect(); mv.currentTime = (e.clientX-r.left)/r.width*mc.file_dur; };
-$("#mIn").onclick = () => { if (mv.currentTime < mc.out - .5) mc.in = +mv.currentTime.toFixed(2); drawM(); };
-$("#mOut").onclick = () => { if (mv.currentTime > mc.in + .5) mc.out = +mv.currentTime.toFixed(2); drawM(); };
-$$("#mTrim [data-n]").forEach(b => b.onclick = () => {
-  const n = b.dataset.n, v = Math.round((mc[n] + +b.dataset.d)*100)/100;
-  if (n === "in" && v >= 0 && v < mc.out - .5) mc.in = v;
-  if (n === "out" && v <= mc.file_dur && v > mc.in + .5) mc.out = v;
-  mv.currentTime = n === "in" ? mc.in : Math.max(mc.in, mc.out - 2); drawM(); });
-$("#mPlay").onclick = () => { mv.currentTime = mc.in; mv.dataset.clip = 1; mv.play(); };
-$("#mClose").onclick = () => { mv.pause(); $("#mTrim").hidden = true; mc = null; };
+$("#mClose").onclick = () => { mEd.clear(); $("#mTrim").hidden = true; mc = null; };
 $("#mSave").onclick = async () => {
-  await api("/api/clip/" + mc.id, {in:mc.in, out:mc.out, category:$("#mCat").value, rating:mc.rating||undefined});
+  await api("/api/clip/" + mc.id, {segs:mEd.segs, category:$("#mCat").value || undefined, rating:mc.rating || undefined});
   $("#mClose").click(); toast("Extrait mis à jour"); refresh(); };
 
-/* ---------------- aperçu du best-of : les extraits à la suite, coupes comprises ---------------- */
-let pl = [], pi = 0;
+/* ---------------- aperçu du best-of : les morceaux de chaque extrait à la suite ---------------- */
+let pl = [], pi = 0, pvTot = 0, pvRaf = 0;
 const pv = $("#pv");
-function pvShow(i){
-  if (i < 0 || i >= pl.length) { pv.pause(); return; }
-  pi = i; const c = pl[i], s = src(c);
-  pv.src = "/files/" + c.file + "#t=" + c.in;
-  pv.onloadedmetadata = () => { pv.currentTime = c.in; pv.play().catch(()=>{}); };
-  $("#pvCredit").textContent = S.settings.lower_third ? ((s.streamer_url || "").replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "") || s.streamer || "") : "";
+function pvGo(i, at){
+  if (i >= pl.length) { pv.pause(); return; }
+  pi = Math.max(0, i); const e = pl[pi], s = src(e.c), t = at ?? e.a;
+  if (pv.dataset.file === e.c.file) { pv.currentTime = t; pv.play().catch(() => {}); }
+  else { pv.dataset.file = e.c.file; pv.src = "/files/" + e.c.file; pv.onloadedmetadata = () => { pv.currentTime = t; pv.play().catch(() => {}); }; }
+  $("#pvCredit").textContent = S.settings.lower_third ? shortUrl(s.streamer_url) || s.streamer || "" : "";
   $("#pvCredit").hidden = !$("#pvCredit").textContent;
-  $("#pvTitle").innerHTML = `${i + 1}/${pl.length} · <b>${esc(s.streamer || "?")}</b> ` +
-    (c.category ? `<span class="cat ${c.category}">${c.category}</span> ` : "") + `<span class="stars">${stars(c.rating)}</span>`;
+  $("#pvTitle").innerHTML = `${e.ci + 1}/${pl[pl.length - 1].ci + 1} · <b>${esc(s.streamer || "?")}</b> ` +
+    (e.c.category ? `<span class="cat ${esc(e.c.category)}">${esc(e.c.category)}</span> ` : "") + `<span class="stars">${stars(e.c.rating)}</span>`;
 }
-pv.ontimeupdate = () => {
-  const c = pl[pi]; if (!c) return;
-  if (pv.currentTime >= c.out) return pvShow(pi + 1);
-  const done = pl.slice(0, pi).reduce((a, x) => a + dur(x), 0) + Math.max(0, pv.currentTime - c.in), tot = pl.reduce((a, x) => a + dur(x), 0);
-  $("#pvTime").textContent = fmt(done); $("#pvBar").style.width = (done / tot * 100) + "%";
-};
+const pvDone = () => { const e = pl[pi]; return e ? e.off + Math.min(e.b - e.a, Math.max(0, pv.currentTime - e.a)) : 0; };
+function pvSeek(g){ if (!pl.length) return; g = Math.max(0, Math.min(pvTot - .1, g)); const k = pieceAt(pl, g); pvGo(k, pl[k].a + g - pl[k].off); }
+function pvCheck(){
+  const e = pl[pi]; if (!e || pv.dataset.file !== e.c.file || !pv.readyState) return;
+  if (pv.currentTime >= e.b - .03) return pvGo(pi + 1);
+  $("#pvTime").textContent = fmt(pvDone()); $("#pvBar").style.width = (pvDone() / pvTot * 100) + "%";
+}
+pv.onplay = () => { cancelAnimationFrame(pvRaf); const f = () => { if (pv.paused) return; pvCheck(); pvRaf = requestAnimationFrame(f); }; pvRaf = requestAnimationFrame(f); };
+pv.ontimeupdate = pvCheck;
+pv.onended = () => pvGo(pi + 1);  // morceau qui finit au bout du fichier
+function pvToggle(){
+  if (!pv.paused) return pv.pause();
+  const e = pl[pi]; if (pi === pl.length - 1 && pv.currentTime >= e.b - .05) pvGo(0); else pv.play().catch(() => {});
+}
+const pvClip = d => { const ci = pl[pi].ci + d, k = pl.findIndex(e => e.ci === ci); if (k >= 0) pvGo(k); else if (d < 0) pvGo(0); else pv.pause(); };
 $("#pPreview").onclick = () => {
-  pl = projItems(); if (!pl.length) return toast("Le best-of est vide");
-  $("#pvTotal").textContent = fmt(pl.reduce((a, x) => a + dur(x), 0));
-  $("#mPrev").hidden = false; applyVol(); pvShow(0);
+  pl = flatPieces(projItems()); if (!pl.length) return toast("Le best-of est vide");
+  pvTot = pl.reduce((a, e) => a + e.b - e.a, 0);
+  $("#pvTotal").textContent = fmt(pvTot); $("#pvTime").textContent = "0:00"; $("#pvBar").style.width = "0";
+  delete pv.dataset.file; $("#mPrev").hidden = false; applyVol(); pvGo(0);
 };
-pv.onended = () => pvShow(pi + 1);  // fin réglée au bout du fichier : timeupdate n'atteint jamais « out »
-$("#pvPrev").onclick = () => pvShow(Math.max(0, pi - 1));
-$("#pvNext").onclick = () => pvShow(pi + 1);
-$("#pvPlay").onclick = () => pv.paused ? pv.play() : pv.pause();
-$("#pvClose").onclick = () => { pv.pause(); pv.removeAttribute("src"); $("#mPrev").hidden = true; };
+$("#pvPrev").onclick = () => pvClip(-1);
+$("#pvNext").onclick = () => pvClip(1);
+$("#pvPlay").onclick = pvToggle;
+$("#pvBack").onclick = () => pvSeek(pvDone() - 3);
+$("#pvFwd").onclick = () => pvSeek(pvDone() + 3);
+$("#pvBarW").onclick = e => { const r = e.currentTarget.getBoundingClientRect(); pvSeek((e.clientX - r.left) / r.width * pvTot); };
+$("#pvClose").onclick = () => { pv.pause(); pv.removeAttribute("src"); delete pv.dataset.file; $("#mPrev").hidden = true; };
 
-/* ---------------- extraits d'une VOD ---------------- */
+/* ---------------- extraits d'une vidéo ---------------- */
 let vodOpen = null;
 const ST = {new:"à trier", kept:"gardé", trash:"poubelle"};
 function openVod(sid){ vodOpen = sid; $("#mVod").hidden = false; renderVod(); }
@@ -940,42 +1337,26 @@ function renderVod(){
   if (!vodOpen) return;
   const s = S.sources.find(x => x.id === vodOpen) || {};
   const cs = S.clips.filter(c => c.source_id === vodOpen).sort((a,b) => (a.src_start+a.in) - (b.src_start+b.in));
-  $("#mvTitle").textContent = (s.streamer || "?") + " — " + cs.length + " extrait(s)";
-  $("#mvInfo").innerHTML = `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title || "")}</a><br>` +
-    ((s.analyses || []).map(a => `Analyse du ${esc(a.date)} · mode ${esc(a.mode)} · ${a.signals} signaux · ${a.clips} extraits · ${esc(a.window)}${steps(a)}`).join("<br>") || "");
-  $("#mvList").innerHTML = cs.map(c => `<div class="item" style="grid-template-columns:96px minmax(0,1fr) auto">
-      <img src="${c.thumb ? "/files/" + c.thumb : ""}" alt="" data-play="${c.id}" title="Regarder / régler">
-      <div class="t">
-        <div><b>${fmt(c.src_start + c.in)}</b> dans la VOD · ${fmt1(dur(c))} ·
-          <span class="${c.status === "kept" ? "" : "muted"}">${ST[c.status]}</span>
-          ${c.category ? `<span class="cat ${c.category}">${c.category}</span> <span class="stars">${stars(c.rating)}</span>` : ""}
-          ${c.ai && c.ai.category ? `<span class="muted small">· 🤖 ${c.ai.category} ${"★".repeat(c.ai.rating || 0)}</span>` : ""}</div>
-        <div class="small muted" title="${esc(c.why)}">${esc(c.why || "")}</div>
+  $("#mvTitle").textContent = (s.streamer || "?") + " · " + nClips(cs.length);
+  $("#mvInfo").innerHTML = s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title || "")}</a>` : esc(s.title || "");
+  $("#mvList").innerHTML = cs.map(c => `<div class="item vclip">
+      <img src="${c.thumb ? "/files/" + esc(c.thumb) : ""}" alt="" data-play="${esc(c.id)}" title="Regarder / régler">
+      <div class="t" data-play="${esc(c.id)}" title="Regarder / régler">
+        <div><b>${fmt(c.src_start + segsOf(c)[0][0])}</b> dans la VOD · ${fmt1(dur(c))} ·
+          <span class="${c.status === "kept" ? "" : "muted"}">${ST[c.status] || esc(c.status)}</span>
+          ${c.category ? `<span class="cat ${esc(c.category)}">${esc(c.category)}</span> <span class="stars">${stars(c.rating)}</span>` : ""}</div>
+        <div class="small muted">${esc(whyText(c))}</div>
       </div>
-      <div class="acts">${c.status === "new" ? "" : `<button data-renew="${c.id}">Remettre à trier</button>`}</div></div>`).join("")
+      <div class="acts">${c.status === "new" ? "" : `<button data-renew="${esc(c.id)}">Remettre à trier</button>`}</div></div>`).join("")
     || `<div class="empty">Aucun extrait.</div>`;
   $$("#mvList [data-play]").forEach(im => im.onclick = () => openTrim(im.dataset.play));
   $$("#mvList [data-renew]").forEach(b => b.onclick = async () => { await api("/api/clip/" + b.dataset.renew, {status:"new"}); toast("Remis dans la pile de tri"); await refresh(); renderVod(); });
 }
 $("#mvClose").onclick = () => { $("#mVod").hidden = true; vodOpen = null; };
 
-/* ---------------- sources ---------------- */
-function renderSources(){
-  const cnt = id => S.clips.filter(c => c.source_id === id && c.status === "kept").length;
-  const t = $("#srcT");
-  if (document.activeElement && t.contains(document.activeElement)) return;
-  t.innerHTML = `<tr><th>Streamer</th><th>Chaîne (crédits)</th><th>Autorisation</th><th>Vidéo source</th><th>Gardés</th></tr>` +
-    S.sources.slice().sort((a,b) => b.added.localeCompare(a.added)).map(s => `<tr data-s="${s.id}">
-      <td><input type="text" data-k="streamer" value="${esc(s.streamer)}" style="width:150px"></td>
-      <td><input type="text" data-k="streamer_url" value="${esc(s.streamer_url)}" style="width:260px"></td>
-      <td><select data-k="auth">${S.auth.map(a => `<option ${a===s.auth?"selected":""}>${a}</option>`).join("")}</select></td>
-      <td class="small"><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)}</a><div class="muted">${esc(s.platform)} · ajouté ${esc(s.added)}</div></td>
-      <td>${cnt(s.id)}</td></tr>`).join("");
-  t.querySelectorAll("[data-k]").forEach(i => i.onchange = async () => {
-    await api("/api/source/" + i.closest("tr").dataset.s, {[i.dataset.k]: i.value}); toast("Enregistré"); refresh(); });
-}
-
 /* ---------------- démarrage ---------------- */
+$$(".vol").forEach(r => r.oninput = e => setVol(+e.target.value));
+$$(".vmute").forEach(b => b.onclick = toggleMute);
 function askName(){
   $("#mName").hidden = false; $("#nameIn").value = me; $("#nameIn").focus();
   const ok = () => { const v = $("#nameIn").value.trim(); if (!v) return; me = v; store.set("bo_user", v);
@@ -986,7 +1367,11 @@ $("#meName").onclick = e => { e.preventDefault(); askName(); };
 $("#meName").textContent = me || "?";
 applyVol();
 if (!me) askName();
-refresh().then(() => show(store.get("bo_view") || (S.clips.some(c => c.status === "new") ? "tri" : "collecte")));
+refresh().then(() => {
+  const v = viewOf(location.hash.slice(1)) || viewOf(store.get("bo_view")) || (S.clips.some(c => c.status === "new") ? "tri" : "videos");
+  if (location.hash.slice(1) !== v) history.replaceState(null, "", "#" + v);
+  show(v);
+});
 setInterval(() => { tick++; if (document.hidden || dragging || !$("#mTrim").hidden || !$("#mPrev").hidden) return;
   const busy = S && (S.jobs.some(j => /attente|cours/.test(j.status)) || (S.machines || []).some(m => m.jobs.length));
   if (busy || tick % 4 === 0) refresh(); }, 2500);

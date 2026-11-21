@@ -1,13 +1,17 @@
-# Best-of GTA 6
+# Orpailleur — best-of GTA 6
 
 Dashboard pour fabriquer des best-of d'environ 10 minutes à partir des streams GTA 6 de tes streamers suivis.
 
-1. **Collecte** : la liste des VODs gratuites terminées depuis moins de 24 h des streamers suivis (Twitch, YouTube, Kick), mise à jour au
-   lancement puis toutes les heures. Après chaque recherche, les nouvelles VODs sur GTA partent **toutes seules** en analyse
-   (bouton **Analyser** pour les autres). L'analyse lit chaque VOD en entier et garde au plus 10 extraits (réglable), téléchargés en
-   16:9 1080p avec 8 s de marge de chaque côté. Une VOD en échec affiche l'erreur ; après 2 échecs elle n'est plus relancée toute seule.
-2. **Tri** : un extrait à la fois, catégorie **WTF / FUN / FAIL / EPIC** et note **1 à 5**. Claude propose une catégorie et une note :
-   **Entrée** la valide.
+1. **Vidéos** : les VODs gratuites terminées depuis moins de 24 h des streamers suivis (Twitch, YouTube, Kick), rangées par jour
+   (**Aujourd'hui / Hier / Plus ancien**) et par état (**À faire / Faites**), mises à jour au lancement puis toutes les heures.
+   Les nouvelles VODs sur GTA partent toutes seules en analyse ; chaque analyse lit la VOD en entier et garde au plus 10 extraits,
+   téléchargés en 16:9 1080p avec 8 s de marge. **Ajouter une vidéo** : un lien YouTube / Twitch / Kick (vidéo, clip, Short) ou un
+   fichier, puis **Mettre directement dans le Tri** (en entier ou un passage, 30 min max) ou **Trouver les meilleurs moments**.
+   Les ajouts à la main arrivent en premier dans le Tri (« ajouté par <prénom> »).
+2. **Tri** : un extrait à la fois (filtre Aujourd'hui / Hier / Plus ancien), catégorie **WTF / FUN / FAIL / EPIC** et note **1 à 5**.
+   Claude propose une catégorie et une note : **Entrée** la valide. Le lecteur (le même dans le Best-of) règle début et fin et
+   **coupe** : « Couper ici » (K) sépare le morceau rose en deux, on raccourcit ensuite un côté ; les passages coupés sont sautés à la
+   lecture et à l'export (pas de chevauchement possible).
 3. **Best-of** : sélection, réglage début/fin, jauge vers l'objectif (10 min), **▶ Aperçu** (les extraits joués à la suite).
    « Remplir » prend les mieux notés, **au plus 2 par streamer**. « Ordre auto » (nouveau tirage à chaque clic) : le meilleur extrait
    sans violence en premier, le 2e meilleur en dernier, le reste **au hasard sans le même streamer ni la même catégorie deux fois
@@ -47,10 +51,16 @@ Claude Code doit être installé et connecté (`claude`). Sans carte NVIDIA, Whi
 
 ## Lancer
 
+Le site démarre **tout seul avec WSL** (service systemd utilisateur `orpailleur`, dans `~/.config/systemd/user/`) :
+
 ```bash
-~/youtube/bestof/start.sh
+orpailleur          # redémarre le site + le moteur (après une mise à jour du code par exemple)
+orpailleur logs     # journal en direct (Ctrl+C pour quitter, le site continue)
+orpailleur stop     # arrête ; orpailleur start / status
 ```
-Ouvre le **lien privé** affiché (`http://localhost:8765/?k=…`). Le moteur de ce PC démarre avec le site (`--no-engine` pour
+Garde une fenêtre Ubuntu ouverte (réduite) : quand toutes sont fermées, Windows éteint WSL au bout de quelques secondes, et le
+site avec. Sans le service : `~/youtube/bestof/start.sh` dans un terminal. Ouvre le **lien privé** (`http://localhost:8765/?k=…`,
+jeton dans `data/config.json`) (`http://localhost:8765/?k=…`). Le moteur de ce PC démarre avec le site (`--no-engine` pour
 ne pas le lancer). La file d'analyse est gardée dans la base : rien n'est perdu à un redémarrage.
 
 Deux personnes peuvent trier en même temps sans tomber sur le même extrait. Ton ami ouvre `https://<adresse Tailscale>/?k=<jeton>`
@@ -111,6 +121,7 @@ NVIDIA (Mac), Whisper tourne sur le processeur avec un modèle plus petit : plus
 | `Entrée` | valide la proposition de Claude |
 | `X` / `↓` / `Z` | poubelle / plus tard / annuler |
 | `I` / `O` | début / fin à la position actuelle (ou boutons ±1 s, ou bords de la barre) |
+| `K` / `Suppr` | couper le morceau ici / supprimer le morceau choisi |
 | `R`, `C`, `V` | signaler radio / cinématique / violence |
 | `Espace`, `←` `→`, `M`, `+` `−` | pause, ±3 s, muet, volume |
 

@@ -110,7 +110,7 @@ def warnings(db):
     no_auth = sorted({db["sources"][c["source_id"]]["streamer"] for c in cs
                       if db["sources"].get(c["source_id"], {}).get("auth") != "obtenue"})
     if no_auth:
-        w.append("Autorisation pas encore obtenue : " + ", ".join(no_auth) + " (onglet Sources).")
+        w.append("Autorisation pas encore obtenue : " + ", ".join(no_auth) + " (onglet Streamers).")
     return w
 
 
@@ -240,12 +240,21 @@ def export(job):
             vf += (f",drawtext=fontfile='{FONT}':textfile='{tf}':x=40:y=40:fontsize=34:fontcolor=white:"
                    f"box=1:boxcolor=black@0.5:boxborderw=12")
         af = f"loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000,afade=t=in:d=0.05,afade=t=out:st={max(0, d - .08):.3f}:d=0.08"
-        has_audio = probe(src)["audio"]
-        cmd = ["ffmpeg", "-v", "error", "-y", "-ss", f"{c['in']:.3f}", "-i", src]
-        if not has_audio:
-            cmd += ["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"]
-        cmd += ["-t", f"{d:.3f}", "-map", "0:v:0", "-map", "0:a:0" if has_audio else "1:a:0", "-vf", vf, "-af", af,
-                "-c:v", "libx264", "-preset", "fast", "-crf", str(conf.get("crf", 18)), "-g", str(fps * 2),
+        has_audio, pieces = probe(src)["audio"], store.segs(c)
+        silence = [] if has_audio else ["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"]  # extrait sans son : silence
+        if len(pieces) == 1:
+            cmd = ["ffmpeg", "-v", "error", "-y", "-ss", f"{c['in']:.3f}", "-i", src, *silence, "-t", f"{d:.3f}", "-map", "0:v:0",
+                   "-map", "0:a:0" if has_audio else "1:a:0", "-vf", vf, "-af", af]
+        else:  # extrait coupé : ses morceaux recollés en un seul segment, puis la même mise en forme
+            fc = "".join(f"[0:v]trim=start={a:.3f}:end={b:.3f},setpts=PTS-STARTPTS[v{k}];" for k, (a, b) in enumerate(pieces))
+            if has_audio:
+                fc += "".join(f"[0:a]atrim=start={a:.3f}:end={b:.3f},asetpts=PTS-STARTPTS[a{k}];" for k, (a, b) in enumerate(pieces))
+            fc += "".join(f"[v{k}]" + (f"[a{k}]" if has_audio else "") for k in range(len(pieces)))
+            fc += f"concat=n={len(pieces)}:v=1:a={int(has_audio)}[vc]" + ("[ac]" if has_audio else "")
+            fc += f";[vc]{vf}[vo];[{'ac' if has_audio else '1:a'}]{af}[ao]"
+            cmd = ["ffmpeg", "-v", "error", "-y", "-i", src, *silence, "-filter_complex", fc, "-map", "[vo]", "-map", "[ao]",
+                   "-t", f"{d:.3f}"]
+        cmd += ["-c:v", "libx264", "-preset", "fast", "-crf", str(conf.get("crf", 18)), "-g", str(fps * 2),
                 "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", dst]
         run(cmd)
         segs.append((dst, c, s))

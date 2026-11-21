@@ -23,6 +23,7 @@ sys.path.insert(0, str(store.ROOT / "vendor" / "gta6clipper"))
 PAD = 8              # secondes téléchargées en plus de chaque côté (pour pouvoir élargir l'extrait au réglage)
 MIN_LEN, MAX_LEN = 12, 60
 CLIP_MAX = 150       # une vidéo plus courte est importée telle quelle (c'est déjà un clip)
+WHOLE_MAX = 1800     # « Mettre directement dans le Tri » : 30 min au plus (sinon un passage, ou la recherche des meilleurs moments)
 AUDIO_W = {"funny": .9, "reaction": .7, "crash": .6, "stunt": .6, "chase": .45, "fight": .5}
 AUDIO_FR = {"funny": "rires", "reaction": "réaction", "crash": "crash", "stunt": "cascade", "chase": "poursuite", "fight": "baston"}
 
@@ -106,7 +107,13 @@ def parse_window(w):
     if not w:
         return None
     a, _, b = w.partition("-")
-    return hms(a), hms(b)
+    try:
+        lo, hi = hms(a), hms(b)
+    except ValueError:
+        lo = hi = 0
+    if hi <= lo:
+        raise ValueError("Passage invalide : écris-le comme 1:02:00-1:05:30 (début-fin).")
+    return lo, hi
 
 
 def fmt(s):
@@ -138,7 +145,7 @@ def streamer_of(m, url):
     pf = platform(url)
     if pf == "twitch":
         login = m.get("uploader_id") if "/videos/" in url else ""
-        mm = re.search(r"twitch\.tv/([A-Za-z0-9_]{3,})(?:/|$)", url)
+        mm = re.search(r"(?://|www\.|m\.)twitch\.tv/([A-Za-z0-9_]{3,})(?:/|$)", url)
         if not login and mm and mm.group(1) not in ("videos", "clip", "clips"):
             login = mm.group(1)
         login = login or name
@@ -165,6 +172,8 @@ def get_source(db, url, m, override="", override_url=""):
         link = override_url
     s = {"id": store.uid(), "url": url, "title": CTX.get("title") or m.get("title") or Path(url).name, "platform": platform(url),
          "streamer": name, "streamer_url": link, "auth": "à demander", "duration": m.get("duration"), "added": store.now()}
+    if CTX.get("added_by"):  # vidéo ajoutée à la main depuis le dashboard
+        s["added_by"] = CTX.get("added_by")
     db["sources"][s["id"]] = s
     return s, True
 
@@ -526,17 +535,18 @@ class _Ctx:
 CTX = _Ctx()
 
 
-def collect(job, inp, max_n=10, window="", streamer="", audio=True, streamer_url="", page_url="", title=""):
+def collect(job, inp, max_n=10, window="", streamer="", audio=True, streamer_url="", page_url="", title="", mode=None, by=""):
     """Tâche de collecte lancée depuis le dashboard. Par défaut : toute la vidéo, 10 moments max.
-    page_url/title : pour Kick, `inp` est le flux HLS de la VOD et page_url la page kick.com (crédits)."""
+    mode : "whole" (la vidéo ou le passage va tel quel dans le Tri) | "auto" (meilleurs moments) | None (courte = whole).
+    by : prénom de qui l'a ajoutée. page_url/title : pour Kick, `inp` est le flux HLS de la VOD et page_url la page kick.com."""
     tools_check()
-    CTX.update(streamer_url=streamer_url, page_url=page_url, title=title)
+    CTX.update(streamer_url=streamer_url, page_url=page_url, title=title, added_by=by)
     inp = inp.strip().strip('"')
     p = Path(inp).expanduser()
     if not re.match(r"https?://", inp):
         if not p.exists():
             raise RuntimeError(f"Fichier introuvable : {inp}")
-        return collect_local(job, p, max_n, window, streamer, audio)
+        return collect_local(job, p, max_n, window, streamer, audio, mode)
     try:
         with job.step("Lecture du lien"):
             m = meta(inp)
@@ -552,31 +562,50 @@ def collect(job, inp, max_n=10, window="", streamer="", audio=True, streamer_url
         for e in ents[:5]:
             u = e.get("webpage_url") or e.get("url")
             try:
-                collect_url(job, u, meta(u), max_n, window, streamer, audio)
+                collect_url(job, u, meta(u), max_n, window, streamer, audio, mode)
             except Exception as ex:  # noqa: BLE001
                 job.log("  ignorée :", ex)
         return None
-    return collect_url(job, inp, m, max_n, window, streamer, audio)
+    return collect_url(job, inp, m, max_n, window, streamer, audio, mode)
 
 
-def collect_url(job, url, m, max_n, window, streamer, audio):
+def collect_url(job, url, m, max_n, window, streamer, audio, mode=None):
     dur = float(m.get("duration") or 0)
     if m.get("is_live") or m.get("live_status") == "is_live":
         raise RuntimeError("Ce stream est en direct : attends la VOD (rediffusion) pour l'analyser.")
-    if dur and dur <= CLIP_MAX and not window:
-        return import_clip(job, url, m, streamer)
+    if (mode or ("whole" if dur and dur <= CLIP_MAX and not window else "auto")) == "whole":
+        return import_clip(job, url, m, streamer, window)
     return analyze(job, url, m, max_n, window, streamer, audio)
 
 
-def import_clip(job, url, m, streamer):
+def import_clip(job, url, m, streamer, window="", local=None):
+    """Mode « whole » : la vidéo (ou seulement le passage) va telle quelle dans le Tri, en UN extrait, en tête de pile."""
+    dur = float(m.get("duration") or 0)
+    lo, hi = parse_window(window) or (0.0, dur)
+    hi = min(hi, dur) if dur else hi
+    if hi - lo > WHOLE_MAX:
+        raise RuntimeError("Trop long pour le mettre en entier : indique un passage, ou choisis « Trouver les meilleurs moments ».")
+    if dur and hi <= lo:
+        raise RuntimeError(f"Passage hors de la vidéo (elle dure {fmt(dur)}).")
     with store.tx() as db:
-        src, new = get_source(db, url, m, streamer, CTX.get("streamer_url", ""))
-        if not new and (src.get("trashed") or any(c["source_id"] == src["id"] for c in db["clips"].values())):
-            job.log("Déjà importé :", src["title"])
-            return None
-    job.log("Vidéo courte, importée en entier :", src["title"])
-    f = download(url, store.uid())
-    add_clip(src, f, 0, 0, None, "vidéo courte importée telle quelle", 1.0)
+        src, _ = get_source(db, local or url, m, streamer, CTX.get("streamer_url", ""))
+        dup = any(a < (hi or 1e9) and b > lo for a, b in taken_for(db, src["url"]))
+    if dup:
+        raise RuntimeError("Déjà ajoutée : ce passage est déjà dans le Tri (ou a été mis à la poubelle).")
+    job.log(f"Ajout tel quel dans le Tri : « {src['title']} »" + (f", de {fmt(lo)} à {fmt(hi)}" if window else ""))
+    cid, s0 = store.uid(), lo
+    with job.step("Téléchargement des extraits en 1080p"):
+        if local and window:
+            f = cut_local(local, cid, lo, hi)
+        elif local:
+            f = store.CLIPS / f"{cid}{Path(local).suffix.lower()}"
+            shutil.copyfile(local, f)
+        elif window and (platform(url) in ("twitch", "kick") or ".m3u8" in url) and "clip" not in url:
+            f, s0 = hls_section(url, cid, lo, hi)  # s0 = début réel (début du 1er morceau de 10 s)
+        else:
+            f = download(url, cid, lo, hi) if window else download(url, cid)
+    by = CTX.get("added_by")
+    add_clip(src, f, s0, lo - s0, hi - s0 if window else None, f"ajouté par {by}" if by else "ajouté à la main", 50)
     return 1
 
 
@@ -731,19 +760,12 @@ def analyze(job, url, m, max_n, window, streamer, audio, local=None):
     return finish(job, url, res, max_n, streamer, local)
 
 
-def collect_local(job, p, max_n, window, streamer, audio):
+def collect_local(job, p, max_n, window, streamer, audio, mode=None):
     p = p.resolve()
     pr = probe(p)
     m = {"title": p.stem, "duration": pr["dur"], "channel": streamer or "Inconnu"}
-    if pr["dur"] <= CLIP_MAX and not window:
-        with store.tx() as db:
-            src, new = get_source(db, str(p), m, streamer)
-        cid = store.uid()
-        f = store.CLIPS / f"{cid}{p.suffix.lower()}"
-        shutil.copyfile(p, f)
-        add_clip(src, f, 0, 0, None, "fichier importé", 1.0)
-        job.log("Fichier importé :", p.name)
-        return 1
+    if (mode or ("whole" if pr["dur"] <= CLIP_MAX and not window else "auto")) == "whole":
+        return import_clip(job, None, m, streamer, window, str(p))
     return analyze(job, None, m, max_n, window, streamer, audio, local=str(p))
 
 
