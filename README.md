@@ -18,6 +18,12 @@ Dashboard pour fabriquer des best-of d'environ 10 minutes à partir des streams 
    de suite**. Les extraits exportés sont marqués « déjà utilisés » et ne sont plus repris.
 4. **Export** : MP4 1920×1080 H.264/AAC normalisé à -14 LUFS, **lien de la chaîne du streamer en haut à gauche** (désactivable), timeline `.fcpxml` pour DaVinci Resolve, description YouTube
    (chapitres + crédits horodatés) et `sources.csv`. Après l'export, **la poubelle est vidée pour de bon** (vidéos et vignettes
+   **Musique et transitions** (carte dans l'onglet Best-of) : envoie tes musiques (MP3…, libres de droits : bibliothèque audio de
+   YouTube Studio, Uppbeat, Pixabay…) puis clique sur 2 ou 3 d'entre elles dans l'ordre voulu. Elles s'enchaînent avec un fondu de
+   3 s (en boucle si la vidéo est plus longue), **baissent toutes seules quand le streamer parle** (environ 12 dB) et s'éteignent en
+   fondu sur les 5 dernières secondes ; la description cite les musiques. Entre deux clips : une transition de 0,4 s tirée au hasard
+   parmi fondu, glissé, zoom, flash blanc, flou et pixels (case pour les couper). Dans un clip coupé, les morceaux sont reliés par un
+   fondu de 0,25 s. L'assemblage final utilise la carte NVIDIA (NVENC) s'il y en a une, sinon le processeur.
    supprimées ; une réanalyse ne repropose pas ces passages).
 
 ## Journaux

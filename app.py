@@ -23,6 +23,7 @@ import store
 import vods
 
 STATIC = store.ROOT / "static"
+STARTED = time.time()  # le code Python n'est lu qu'au démarrage : s'il change après, le site affiche « redémarre »
 LEASE_S = 180
 LEASES = {}  # clip_id -> (utilisateur, expiration) : deux personnes ne trient pas le même extrait en même temps
 CONF = engines.CONF  # un seul dict pour app.py et engines.py (jetons des machines, réglages)
@@ -33,10 +34,12 @@ def state():
         db = store.load()
         return {"clips": list(db["clips"].values()), "sources": list(db["sources"].values()), "project": db["project"],
                 "archive": db["archive"][-20:], "exports": db["exports"][:20], "warnings": montage.warnings(db),
+                "music": list(db["music"].values()),  # dans l'ordre d'ajout
                 "jobs": jobs.listing(), "cats": store.CATS, "auth": store.AUTH,
                 "settings": {k: CONF[k] for k in SETTINGS},
                 "vods": vod_rows(db), "vods_scan": db.get("vods_scan"), "follow": vods.settings(),
-                "machines": engines.machines_view(), "engine_conf": engines.engine_conf(), "hub_version": engines.VERSION}
+                "machines": engines.machines_view(), "engine_conf": engines.engine_conf(), "hub_version": engines.VERSION,
+                "stale": any(f.stat().st_mtime > STARTED for f in store.ROOT.glob("*.py"))}
 
 
 SETTINGS = ("fps", "lower_third", "max_moments", "ai")
@@ -242,18 +245,71 @@ def patch_project(body):
                 if i in db["clips"] and db["clips"][i]["status"] == "kept" and i not in seen:
                     seen.append(i)
             pj["items"] = seen
+        if isinstance(body.get("music"), list):
+            pj["music"] = list(dict.fromkeys(m for m in body["music"] if isinstance(m, str) and m in db["music"]))[:5]
+        if isinstance(body.get("music_vol"), (int, float)) and 0 <= body["music_vol"] <= 100:
+            pj["music_vol"] = round(body["music_vol"])
+        if isinstance(body.get("transitions"), bool):
+            pj["transitions"] = body["transitions"]
         mode = body.get("auto")
         if mode == "order":
             pj["items"] = montage.auto_order([db["clips"][i] for i in pj["items"]], montage.streamer_of(db))
         elif mode == "fill":
             montage.fill(db)
         elif mode == "new":
-            db["archive"].append({k: pj[k] for k in ("id", "name", "items", "created")})
+            db["archive"].append({k: pj.get(k) for k in ("id", "name", "items", "created", "music", "music_vol", "transitions")})
             for i in pj["items"]:
                 db["clips"][i]["used_in"] = db["clips"][i].get("used_in") or pj["name"]
             n = len(db["archive"]) + 1
             db["project"] = store.new_project(n)
         return db["project"]
+
+
+def recv(rfile, size, dst):
+    """Corps brut d'un envoi de fichier (size octets) -> dst."""
+    with dst.open("wb") as f:
+        while size > 0:
+            chunk = rfile.read(min(1 << 20, size))
+            if not chunk:
+                break
+            f.write(chunk)
+            size -= len(chunk)
+
+
+MUSIC_EXT = ("mp3", "m4a", "aac", "wav", "ogg", "opus", "flac")
+MUSIC_MAX = 60 << 20
+
+
+def add_music(name, size, rfile, by=""):
+    """Musique de fond envoyée depuis le dashboard : format et poids vérifiés avant l'envoi, puis il faut un son d'au moins 10 s."""
+    stem, ext = os.path.splitext(os.path.basename(str(name).replace("\\", "/")))
+    ext = ext.lower().lstrip(".")
+    if ext not in MUSIC_EXT:
+        raise ValueError("Format de musique non pris en charge : MP3, M4A, AAC, WAV, OGG, OPUS ou FLAC.")
+    if size > MUSIC_MAX:
+        raise ValueError("Musique trop lourde : 60 Mo maximum.")
+    mid = store.uid()
+    dst = store.MUSIC / f"{mid}.{ext}"
+    recv(rfile, size, dst)
+    p = collect.probe(dst)
+    if not p["audio"] or p["dur"] < 10:
+        dst.unlink(missing_ok=True)
+        raise ValueError("Musique trop courte : 10 s minimum." if p["audio"] else "Ce fichier n'est pas une musique lisible.")
+    t = {"id": mid, "name": stem.strip()[:100] or "Musique", "file": f"media/music/{dst.name}", "dur": round(p["dur"], 1),
+         "added": store.now(), "by": by}
+    with store.tx() as db:
+        db["music"][mid] = t
+    return t
+
+
+def del_music(mid):
+    with store.tx() as db:
+        t = db["music"].pop(mid, None)
+        if not t:
+            raise KeyError("musique introuvable")
+        db["project"]["music"] = [m for m in db["project"].get("music", []) if m != mid]
+    (store.DATA / t["file"]).unlink(missing_ok=True)
+    return {"ok": True}
 
 
 def patch_source(sid, body):
@@ -463,17 +519,15 @@ class H(BaseHTTPRequestHandler):
                 check_add(q.get("mode", [None])[0], q.get("window", [""])[0])  # avant de recevoir le fichier
                 name = collect.safe_name(q.get("name", ["video.mp4"])[0])
                 dst = store.INBOX / f"{store.uid()}_{name}"
-                left = int(self.headers.get("Content-Length") or 0)
-                with dst.open("wb") as f:
-                    while left > 0:
-                        chunk = self.rfile.read(min(1 << 20, left))
-                        if not chunk:
-                            break
-                        f.write(chunk)
-                        left -= len(chunk)
+                recv(self.rfile, int(self.headers.get("Content-Length") or 0), dst)
                 streamer = q.get("streamer", [""])[0]
                 n = max(1, min(50, int(q.get("max", [str(CONF["max_moments"])])[0] or 10)))
                 return self.send_json(self.add_video(name, str(dst), n, q.get("window", [""])[0], streamer, q.get("mode", [None])[0]))
+            if method == "POST" and path == "/api/music/upload":
+                return self.send_json(add_music(q.get("name", [""])[0], int(self.headers.get("Content-Length") or 0), self.rfile,
+                                                "" if self.user() == "?" else self.user()))
+            if method == "POST" and re.fullmatch(r"/api/music/\w+/delete", path):
+                return self.send_json(del_music(path.split("/")[3]))
             if method == "POST" and path.startswith("/api/clip/"):
                 return self.send_json(patch_clip(path.rsplit("/", 1)[1], self.body(), self.user()))
             if method == "POST" and path.startswith("/api/source/"):

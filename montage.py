@@ -62,23 +62,21 @@ def auto_order(clips, who=lambda c: c.get("source_id")):
 
 def fill(db):
     """Ajoute les meilleurs extraits gardés (non utilisés) jusqu'à la durée cible, au plus 2 par streamer, puis l'ordre auto."""
-    pj, who = db["project"], streamer_of(db)
-    items = [i for i in pj["items"] if i in db["clips"]]
-    total = sum(store.cdur(db["clips"][i]) for i in items)
+    pj, who, tr = db["project"], streamer_of(db), db["project"].get("transitions", True)
+    cs = [db["clips"][i] for i in pj["items"] if i in db["clips"]]
     count = {}
-    for i in items:
-        count[who(db["clips"][i])] = count.get(who(db["clips"][i]), 0) + 1
-    pool = sorted((c for c in db["clips"].values() if c["status"] == "kept" and not c.get("used_in") and c["id"] not in items),
+    for c in cs:
+        count[who(c)] = count.get(who(c), 0) + 1
+    pool = sorted((c for c in db["clips"].values() if c["status"] == "kept" and not c.get("used_in") and c["id"] not in pj["items"]),
                   key=_key)
     for c in pool:
-        if total >= pj["target"] - 10:
+        if store.bestof_total(cs, tr) >= pj["target"] - 10:
             break
-        if total + store.cdur(c) > pj["target"] + 30 or count.get(who(c), 0) >= MAX_PER_STREAMER:
+        if store.bestof_total(cs + [c], tr) > pj["target"] + 30 or count.get(who(c), 0) >= MAX_PER_STREAMER:
             continue
-        items.append(c["id"])
-        total += store.cdur(c)
+        cs.append(c)
         count[who(c)] = count.get(who(c), 0) + 1
-    pj["items"] = auto_order([db["clips"][i] for i in items], who)
+    pj["items"] = auto_order(cs, who)
 
 
 def warnings(db):
@@ -87,7 +85,7 @@ def warnings(db):
     w = []
     if not cs:
         return w
-    total = sum(store.cdur(c) for c in cs)
+    total = store.bestof_total(cs, pj.get("transitions", True))
     if total < pj["target"] * .8:
         w.append(f"Il manque {fmt(pj['target'] - total)} pour atteindre l'objectif.")
     elif total > pj["target"] * 1.25:
@@ -122,16 +120,23 @@ def credit(s):
 
 
 def _rows(db, durs=None):
-    """[(clip, source, start_in_bestof, dur)] dans l'ordre du best-of."""
+    """[(clip, source, start_in_bestof, dur)] dans l'ordre du best-of (avec transitions : chaque extrait commence 0,4 s plus tôt)."""
     out, t = [], 0.0
-    for i, cid in enumerate(db["project"]["items"]):
+    xt = store.XT if db["project"].get("transitions", True) else 0
+    for cid in db["project"]["items"]:
         c = db["clips"].get(cid)
         if not c:
             continue
-        d = durs[i] if durs else store.cdur(c)
+        d = durs[len(out)] if durs else store.cdur(c)
         out.append((c, db["sources"].get(c["source_id"], {}), t, d))
-        t += d
+        t += d - xt
     return out
+
+
+def music_of(db):
+    """Musiques choisies pour le best-of, dans l'ordre (celles supprimées de la bibliothèque sont ignorées)."""
+    lib = db.get("music") or {}
+    return [lib[m] for m in db["project"].get("music") or [] if m in lib]
 
 
 def description(db, durs=None):
@@ -156,6 +161,9 @@ def description(db, durs=None):
         for c, t in lst:
             if s.get("platform") != "local":
                 L.append(f"   {fmt(t)} dans la vidéo : {ts_link(s['url'], c['src_start'] + c['in'])}")
+    music = music_of(db)
+    if music:
+        L += ["", "Musique : " + ", ".join(m["name"] for m in music)]
     L += ["", "Abonne-toi pour le prochain best-of GTA 6 !"]
     return "\n".join(L) + "\n"
 
@@ -207,6 +215,78 @@ def fcpxml(name, segs, fps):
             + "\n".join(res) + f'\n</resources>\n<library><event name="{_esc(name)}"><project name="{_esc(name)}">'
             f'<sequence format="r0" duration="{off}/{fps}s" tcStart="0s" tcFormat="NDF" audioLayout="stereo" audioRate="48k"><spine>\n'
             + "\n".join(spine) + "\n</spine></sequence></project></event></library>\n</fcpxml>\n")
+
+
+TRANSITIONS = ("fade", "smoothleft", "zoomin", "fadewhite", "hblur", "pixelize")  # fondu, glissé, zoom, flash blanc, flou, pixels
+
+
+def pick_transitions(n):
+    """n transitions xfade : les 6 dans un ordre aléatoire, puis encore les 6…, jamais la même deux fois de suite."""
+    out = []
+    while len(out) < n:
+        bag = random.sample(TRANSITIONS, len(TRANSITIONS))
+        if out and bag[0] == out[-1]:
+            bag.reverse()
+        out += bag
+    return out[:n]
+
+
+def stream_durs(p):
+    """{"video": s, "audio": s} : durée de chaque flux (celle du fichier est la plus longue des deux)."""
+    r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=codec_type,duration", "-of", "json", str(p)],
+                       capture_output=True, text=True)
+    return {s["codec_type"]: float(s.get("duration") or 0) for s in json.loads(r.stdout or "{}").get("streams", [])}
+
+
+def music_bed(dst, music, total, vol):
+    """Musique de fond de la durée de la vidéo : les morceaux dans l'ordre (répétés si la vidéo est plus longue) reliés par
+    des fondus de 3 s, volume vol, fondu d'entrée 1 s, fondu de sortie 5 s qui finit pile à la fin."""
+    seq, L = [], 0.0
+    while L < total + 1:  # morceaux de 10 s minimum (vérifié à l'ajout) : chacun avance d'au moins 7 s
+        m = music[len(seq) % len(music)]
+        L += m["dur"] - (3 if seq else 0)
+        seq.append(m)
+    fc = [f"[{k}:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[m{k}]" for k in range(len(seq))]
+    c = "[m0]"
+    for k in range(1, len(seq)):
+        fc.append(f"{c}[m{k}]acrossfade=d=3[c{k}]")
+        c = f"[c{k}]"
+    fc.append(f"{c}atrim=end={total:.3f},volume={vol:.3f},afade=t=in:d=1,afade=t=out:st={max(0, total - 5):.3f}:d=5[out]")
+    run(["ffmpeg", "-v", "error", "-y", *[x for m in seq for x in ("-i", store.DATA / m["file"])], "-filter_complex", ";".join(fc),
+         "-map", "[out]", "-c:a", "pcm_s16le", dst])
+
+
+def assemble(job, mp4, files, durs, names, music, vol, fps, crf):
+    """Une passe sur tous les segments : transitions xfade (names, une par raccord) ou simple mise bout à bout, musique de fond
+    baissée par la voix des streamers, encodage par la carte graphique (NVENC), sinon par le processeur."""
+    n, xt = len(files), store.XT
+    total = sum(durs) - xt * len(names)
+    # son de chaque segment complété ou coupé pile à la durée de son image (compté en échantillons à 48 kHz, ses horodatages
+    # ne sont pas fiables) : il dépasse de quelques dizaines de ms, ce qui décalerait le son de l'image au fil des extraits
+    fc = [f"[{k}:a]asetpts=N/SR/TB,apad,atrim=end_sample={round(d * 48000)}[s{k}]" for k, d in enumerate(durs)]
+    v, a, L = "[0:v]", "[s0]", durs[0]
+    for k, name in enumerate(names, 1):  # raccord k : la fin de la vidéo jusqu'ici et le début du segment k se chevauchent de xt
+        fc += [f"{v}[{k}:v]xfade=transition={name}:duration={xt}:offset={L - xt:.3f}[v{k}]", f"{a}[s{k}]acrossfade=d={xt}[a{k}]"]
+        v, a, L = f"[v{k}]", f"[a{k}]", L + durs[k] - xt
+    if not names:
+        fc.append("".join(f"[{k}:v][s{k}]" for k in range(n)) + f"concat=n={n}:v=1:a=1[v][a]")
+        v, a = "[v]", "[a]"
+    inputs = [x for f in files for x in ("-i", f)]
+    bed = mp4.with_name("musique.wav")
+    if music:
+        music_bed(bed, music, total, vol)
+        inputs += ["-i", bed]
+        fc += [f"{a}asplit=2[voix][sc]", f"[{n}:a][sc]sidechaincompress=threshold=0.02:ratio=10:attack=20:release=350[md]",
+               "[voix][md]amix=inputs=2:duration=first:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000[ao]"]
+        a = "[ao]"
+    cmd = ["ffmpeg", "-v", "error", "-y", *inputs, "-filter_complex", ";".join(fc), "-map", v, "-map", a]
+    out = ["-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", mp4]
+    try:
+        run(cmd + ["-c:v", "h264_nvenc", "-preset", "p5", "-tune", "hq", "-rc", "vbr", "-cq", "19", "-b:v", "0", "-g", str(fps * 2), *out])
+    except RuntimeError:
+        job.log("Carte graphique indisponible pour l'encodage : la vidéo est encodée par le processeur (plus lent).")
+        run(cmd + ["-c:v", "libx264", "-preset", "fast", "-crf", str(crf), "-g", str(fps * 2), *out])
+    bed.unlink(missing_ok=True)
 
 
 def export(job):
@@ -263,12 +343,25 @@ def export(job):
                 "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", dst]
         run(cmd)
         segs.append((dst, c, s))
-        durs.append(probe(dst)["dur"] or d)
-    job.log("Assemblage…")
-    lst = out / "liste.txt"
-    lst.write_text("".join("file '" + str(p).replace("'", "'\\''") + "'\n" for p, _c, _s in segs), "utf-8")
+        durs.append(stream_durs(dst).get("video") or d)
     mp4 = out / f"{slug}.mp4"
-    run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-c", "copy", "-movflags", "+faststart", mp4])
+    tr, music = pj.get("transitions", True) and len(segs) > 1, music_of(db)
+    if tr and min(durs) < 2 * store.XT + .1:  # pas la place pour une transition à chaque bout d'un extrait si court
+        tr = pj["transitions"] = False  # (copie locale : description et CSV sans transitions)
+        job.log("Transitions désactivées : un extrait dure moins d'une seconde.")
+    job.log("Assemblage…")
+    if tr or music:
+        names = pick_transitions(len(segs) - 1) if tr else []
+        if names:
+            job.log(f"Transitions : 6 types, ordre aléatoire ({len(names)} × 0,4 s)")
+        if music:
+            job.log("Musique : " + " → ".join(m["name"] for m in music) + f" (volume {pj.get('music_vol', 20)} %)")
+        assemble(job, mp4, [p for p, _c, _s in segs], durs, names, music, pj.get("music_vol", 20) / 100 * 1.75, fps,
+                 conf.get("crf", 18))
+    else:  # ni transition ni musique : les segments mis bout à bout sans réencodage
+        lst = out / "liste.txt"
+        lst.write_text("".join("file '" + str(p).replace("'", "'\\''") + "'\n" for p, _c, _s in segs), "utf-8")
+        run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-c", "copy", "-movflags", "+faststart", mp4])
     (out / f"{slug}.fcpxml").write_text(fcpxml(pj["name"], [(p, round(d * fps), c, s) for (p, c, s), d in zip(segs, durs)], fps), "utf-8")
     (out / "description_youtube.txt").write_text(description(db, durs), "utf-8")
     (out / "sources.csv").write_text(sources_csv(db, durs), "utf-8")

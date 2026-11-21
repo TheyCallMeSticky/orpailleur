@@ -212,12 +212,69 @@ with store.tx() as db:
         db["clips"][cid] = {"id": cid, "source_id": "sc", "status": "kept", "file": f"media/clips/{cid}.mp4", "src_start": 0,
                             "in": 0, "out": 30, "file_dur": 30.0, "fps": 30, "rating": 4, "category": "FUN", "flags": {}}
     db["project"]["items"] = ["av", "mute"]
+    db["project"]["transitions"] = False  # ni transition ni musique : segments mis bout à bout sans réencodage
 app.patch_clip("av", {"segs": [[2, 5], [10, 14]]}, "u")
 app.patch_clip("mute", {"segs": [[1, 3], [20, 23.5]]}, "u")
 rec = montage.export(jobs.Job("export", "test", None, ()))
 seg = sorted((store.DATA / rec["dir"] / "segments").glob("*.mp4"))
 assert [abs(collect.probe(f)["dur"] - d) < .2 for f, d in zip(seg, (6.75, 5.25))] == [True, True], [collect.probe(f) for f in seg]
 assert all(collect.probe(f)["audio"] for f in seg) and abs(rec["dur"] - 12.0) < .3, rec
+assert (store.DATA / rec["dir"] / "liste.txt").exists()  # ancien chemin (copie)
+
+# transitions : les 6, jamais la même deux fois de suite
+for n in list(range(15)) * 20 + [100]:
+    t = montage.pick_transitions(n)
+    assert len(t) == n and set(t) <= set(montage.TRANSITIONS) and all(t[k] != t[k - 1] for k in range(1, n)), t
+assert set(montage.pick_transitions(6)) == set(montage.TRANSITIONS)
+
+# chapitres et crédits avec transitions : chaque extrait commence 0,4 s plus tôt
+d4 = {"project": {"name": "T", "items": ["c0", "c1", "c2", "c3"], "transitions": True}, "music": {},
+      "sources": {"s": {"streamer": "Kai", "url": "https://www.twitch.tv/videos/1", "platform": "twitch"}},
+      "clips": {f"c{k}": {"id": f"c{k}", "source_id": "s", "category": cat, "src_start": 0, "in": 0, "out": 20}
+                for k, cat in enumerate(("FUN", "WTF", "FAIL", "EPIC"))}}
+assert "0:00 Intro\n0:20 WTF\n0:39 FAILS\n0:59 Final\n" in montage.description(d4) and "   0:59 dans la vidéo" in montage.description(d4)
+assert abs(store.bestof_total(list(d4["clips"].values())) - 78.8) < 1e-9 and store.bestof_total(list(d4["clips"].values()), False) == 80
+d4["project"]["transitions"] = False
+assert "0:00 Intro\n0:20 WTF\n0:40 FAILS\n1:00 Final\n" in montage.description(d4)
+
+# musiques de fond : format, son et durée vérifiés à l'envoi (un fichier refusé est supprimé)
+import io  # noqa: E402
+
+
+def tone(sec, f):
+    w = store.TMP / f"{f}.wav"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", f"sine=frequency={f}:sample_rate=44100:duration={sec}",
+                    "-ac", "1", str(w)], check=True)
+    return w.read_bytes()
+
+
+for name, data in (("note.txt", b"x"), ("faux.mp3", b"pas du son" * 100), ("court.wav", tone(3, 300))):
+    try:
+        app.add_music(name, len(data), io.BytesIO(data))
+        raise AssertionError(f"musique acceptée : {name}")
+    except ValueError:
+        pass
+assert not any(store.MUSIC.iterdir())
+b1, b2 = tone(11, 440), tone(11, 660)
+m1, m2 = app.add_music("C:\\Musique\\Piste A.wav", len(b1), io.BytesIO(b1), "u"), app.add_music("Piste B.WAV", len(b2), io.BytesIO(b2))
+assert (m1["name"], m2["name"]) == ("Piste A", "Piste B") and abs(m1["dur"] - 11) < .2 and (store.DATA / m1["file"]).is_file(), m1
+assert [m["id"] for m in app.state()["music"]] == [m1["id"], m2["id"]]
+pj = app.patch_project({"music": [m1["id"], "zz", m2["id"], m1["id"]], "music_vol": 30, "transitions": True})
+assert (pj["music"], pj["music_vol"], pj["transitions"]) == ([m1["id"], m2["id"]], 30, True), pj
+
+# export avec transitions + 2 musiques (répétées : 19 s de musique pour 20,2 s de vidéo) : 3 × 7 s - 2 transitions
+with store.tx() as db:
+    for k in range(3):
+        db["clips"][f"t{k}"] = {"id": f"t{k}", "source_id": "sc", "status": "kept", "file": "media/clips/av.mp4", "src_start": 0,
+                                "in": k * 8, "out": k * 8 + 7, "file_dur": 30.0, "fps": 30, "rating": 4, "category": "FUN", "flags": {}}
+    db["project"]["items"] = ["t0", "t1", "t2"]
+rec = montage.export(jobs.Job("export", "test", None, ()))
+sd = montage.stream_durs(store.DATA / rec["files"]["mp4"])
+assert abs(rec["dur"] - (21 - 2 * store.XT)) < .3 and abs(sd["audio"] - sd["video"]) < .1, (rec, sd)
+assert "Musique : Piste A, Piste B" in (store.DATA / rec["files"]["description"]).read_text("utf-8")
+assert not (store.DATA / rec["dir"] / "liste.txt").exists() and not (store.DATA / rec["dir"] / "musique.wav").exists()
+assert app.del_music(m2["id"]) and store.load()["project"]["music"] == [m1["id"]] and not (store.DATA / m2["file"]).exists()
+assert [m["id"] for m in store.load()["music"].values()] == [m1["id"]]
 
 # ajout à la main « tel quel dans le Tri » (fichier local) : un passage = un extrait en tête du Tri ; > 30 min refusé
 long = store.TMP / "long.mp4"

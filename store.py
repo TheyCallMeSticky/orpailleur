@@ -17,7 +17,8 @@ THUMBS = MEDIA / "thumbs"
 EXPORTS = DATA / "exports"
 TMP = DATA / "tmp"
 INBOX = DATA / "inbox"
-for _d in (CLIPS, THUMBS, EXPORTS, TMP, INBOX):
+MUSIC = MEDIA / "music"  # musiques de fond (servies par /files/ pour les écouter)
+for _d in (CLIPS, THUMBS, EXPORTS, TMP, INBOX, MUSIC):
     _d.mkdir(parents=True, exist_ok=True)
 
 CATS = ("WTF", "FUN", "FAIL", "EPIC")
@@ -39,11 +40,13 @@ def now():
 
 
 def new_project(n=1):
-    return {"id": uid(), "name": f"Best-of #{n}", "target": 600, "items": [], "created": now()}
+    # music : ids des musiques de fond dans l'ordre ; music_vol : volume en % ; transitions entre les extraits
+    return {"id": uid(), "name": f"Best-of #{n}", "target": 600, "items": [], "created": now(),
+            "music": [], "music_vol": 20, "transitions": True}
 
 
 def _empty():
-    return {"sources": {}, "clips": {}, "project": new_project(1), "archive": [], "exports": []}
+    return {"sources": {}, "clips": {}, "project": new_project(1), "archive": [], "exports": [], "music": {}}
 
 
 def load():
@@ -53,6 +56,8 @@ def load():
             _db = json.loads(DB.read_text("utf-8")) if DB.exists() else _empty()
             for k, v in _empty().items():
                 _db.setdefault(k, v)
+            for k, v in new_project().items():  # best-of commencé avant la musique et les transitions
+                _db["project"].setdefault(k, v)
         return _db
 
 
@@ -103,6 +108,14 @@ def cdur(c):
     """Durée utile d'un extrait : ses morceaux (après réglage et coupes), moins les fondus qui les relient."""
     p = segs(c)
     return sum(max(0.0, float(b) - float(a)) for a, b in p) - sum(joins(p))
+
+
+XT = 0.4  # transition entre deux extraits du best-of (ils se chevauchent d'autant)
+
+
+def bestof_total(clips, transitions=True):
+    """Durée finale du best-of : les extraits, moins une transition de 0,4 s entre deux extraits."""
+    return sum(cdur(c) for c in clips) - (XT * (len(clips) - 1) if transitions and clips else 0)
 
 
 def day(t):

@@ -108,9 +108,9 @@ kbd{border:1px solid var(--line2);border-bottom-width:2px;border-radius:5px;padd
 .item .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .item .acts button{padding:5px 11px}
 .item .acts:empty{display:none}
-.item [data-add],.item [data-bin]{width:36px;height:36px;padding:0;border-radius:50%;display:inline-flex;align-items:center;justify-content:center}
+.item [data-add],.item [data-bin],.item [data-mbin],.item [data-mplay]{width:36px;height:36px;padding:0;border-radius:50%;display:inline-flex;align-items:center;justify-content:center}
 .item [data-add]{color:var(--ink);background:var(--mint);border-color:var(--mint)}
-.item [data-bin][data-armed]{width:auto;padding:0 12px;border-radius:18px;color:var(--err);border-color:var(--err)}
+.item [data-bin][data-armed],.item [data-mbin][data-armed]{width:auto;padding:0 12px;border-radius:18px;color:var(--err);border-color:var(--err)}
 .item [data-add]:hover{filter:brightness(1.1)}
 .item [data-rm]:hover{border-color:var(--err);color:var(--err)}
 .item.drag{opacity:.4}
@@ -227,6 +227,11 @@ details.opts summary{cursor:pointer;width:max-content}
 #exps .row a{padding:4px 11px;border:1px solid var(--line2);border-radius:999px;color:var(--text);font-size:12.5px}
 #exps .row a:hover{border-color:var(--mint);color:var(--mint);text-decoration:none}
 #pNew{color:var(--muted)}
+#mus .item{grid-template-columns:auto minmax(0,1fr) auto;padding:6px 10px}
+#mus .item.on{border-color:var(--accent);background:#fd1fb01a}
+#mus .t{cursor:pointer}
+#mus .t .badge{margin:0 4px 0 0}
+#muLine b{color:var(--text)}
 
 /* Machines */
 .job{border-top:1px solid var(--line);padding:12px 0}
@@ -314,6 +319,8 @@ th{color:var(--dim);font-weight:700;font-size:11.5px;text-transform:uppercase;le
   </nav>
   <span class="me small">Trié par : <a href="#" id="meName"></a></span>
 </header>
+<div id="stale" hidden style="background:var(--warn,#ffb020);color:#1a0424;padding:8px 16px;text-align:center;font-weight:600">
+  Mise à jour en attente : tape <code>orpailleur</code> dans Ubuntu pour redémarrer le serveur (sinon les nouveautés ne marchent pas).</div>
 
 <main>
 <!-- ================= VIDÉOS ================= -->
@@ -409,6 +416,7 @@ th{color:var(--dim);font-weight:700;font-size:11.5px;text-transform:uppercase;le
       </div>
       <div class="list" id="lib"></div>
     </div>
+    <div class="stack">
     <div class="panel">
       <div class="row between">
         <input type="text" id="pName" style="flex:1;min-width:160px" aria-label="Nom du best-of">
@@ -443,6 +451,21 @@ th{color:var(--dim);font-weight:700;font-size:11.5px;text-transform:uppercase;le
       <div class="row" style="margin-top:16px">
         <button id="pNew" class="ghost">Terminer ce best-of et en commencer un nouveau</button>
       </div>
+    </div>
+    <div class="panel" id="mus">
+      <h2>Musique et transitions</h2>
+      <div class="small muted" id="muLine"></div>
+      <div class="list" id="muLib"></div>
+      <div class="row" style="margin-top:12px">
+        <label class="small muted">Ajouter des musiques <input type="file" id="muFile" accept="audio/*" multiple></label>
+      </div>
+      <div class="row" style="margin-top:8px;gap:8px 24px">
+        <span class="small muted">Le volume est automatique : la musique baisse quand le streamer parle.</span>
+        <label class="row small" title="Fondu, glissé, zoom, flash blanc, flou, pixels — dans un ordre aléatoire"><input type="checkbox" id="muTr"> Transitions entre les clips</label>
+      </div>
+      <p class="small muted" style="margin:10px 0 0">Musique libre de droits uniquement (bibliothèque audio de YouTube Studio, NCS…), sinon YouTube réclame les revenus de la vidéo.</p>
+      <audio id="muAudio" hidden></audio>
+    </div>
     </div>
   </div>
 </section>
@@ -539,6 +562,7 @@ th{color:var(--dim);font-weight:700;font-size:11.5px;text-transform:uppercase;le
         <input type="range" class="vol" min="0" max="100" step="5" aria-label="Volume"><span class="volv small muted"></span>
       </div>
     </div>
+    <p class="small muted" style="margin:10px 0 0">La musique et les transitions sont ajoutées à l'export.</p>
   </div>
 </div>
 
@@ -644,7 +668,7 @@ async function api(path, body){
 let vol = (() => { const v = store.get("bo_vol"); return v === null || isNaN(+v) ? 25 : +v; })(), muted = false;
 function applyVol(){
   vol = Math.max(0, Math.min(100, Math.round(vol / 5) * 5)); store.set("bo_vol", vol);
-  for (const v of $$("video")) { v.volume = vol / 100; v.muted = muted || vol === 0; }
+  for (const v of $$("video,audio")) { v.volume = vol / 100; v.muted = muted || vol === 0; }
   $$(".vol").forEach(r => r.value = vol); $$(".volv").forEach(s => s.textContent = vol + " %");
   $$(".vmute").forEach(b => b.textContent = muted || vol === 0 ? "🔇" : vol < 40 ? "🔉" : "🔊");
 }
@@ -782,6 +806,7 @@ function show(v){
   $$("nav button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
   $$(".view").forEach(s => s.hidden = s.id !== "v-"+v);
   if (v !== "tri") tEd.pause();
+  if (v !== "bestof") au.pause();  // l'écoute d'une musique s'arrête en quittant le Best-of
   if (v === "tri" && !cur) loadNext();
   render();
 }
@@ -794,9 +819,10 @@ async function refresh(){
 }
 function render(){
   if (!S) return;
+  $("#stale").hidden = !S.stale;
   const nNew = S.clips.filter(c => c.status === "new").length;
   $("#nNew").textContent = nNew;
-  $("#nBo").textContent = fmt(projItems().reduce((a,c)=>a+dur(c),0));
+  $("#nBo").textContent = fmt(boTotal(projItems()));
   if (view === "videos") renderVods();
   if (view === "machines") { renderMachines(); renderJobs(); }
   if (vodOpen && $("#mTrim").hidden) renderVod();
@@ -1195,6 +1221,8 @@ $("#lCat").innerHTML += CATS.map(c => `<option>${c}</option>`).join("");
 ["#lCat","#lMin","#lSort","#lStatus"].forEach(s => $(s).onchange = renderBestof);
 $("#lQ").oninput = renderBestof;
 const projItems = () => S.project.items.map(id => S.clips.find(c => c.id === id)).filter(Boolean);
+const XT = .4;  // transition entre deux extraits à l'export (comme montage) : ils se chevauchent d'autant
+const boTotal = cs => cs.reduce((a, c) => a + dur(c), 0) - (S.project.transitions !== false && cs.length > 1 ? XT * (cs.length - 1) : 0);
 async function saveProject(body){ S.project = await api("/api/project", body); refresh(); }
 
 function itemHTML(c, i, inProj){
@@ -1218,7 +1246,7 @@ function renderBestof(){
   if (document.activeElement !== $("#pName")) $("#pName").value = pj.name;
   if (document.activeElement !== $("#pTarget")) $("#pTarget").value = Math.round(pj.target/60);
   $("#sFps").value = S.settings.fps; $("#sLower").checked = !!S.settings.lower_third;
-  const tot = items.reduce((a,c)=>a+dur(c),0);
+  const tot = boTotal(items);
   $("#pTotal").textContent = fmt(tot) + " / " + fmt(pj.target);
   $("#pCount").textContent = items.length + " extraits";
   $("#pGauge").classList.toggle("over", tot > pj.target*1.1);
@@ -1249,19 +1277,69 @@ function renderBestof(){
   $("#pExport").disabled = !!run || !items.length;
   $("#pExport").textContent = run ? "Export en cours…" : "Exporter";
   if (run) $("#exps").insertAdjacentHTML("afterbegin", `<pre class="muted small">${esc(run.lines.join("\n"))}</pre>`);
-  wireLists();
+  wireLists(); renderMusic();
 }
+/* musique du best-of : bibliothèque commune, clic = dans ce best-of ou non (ordre = ordre des clics), ▶ = écouter */
+const au = $("#muAudio");
+function renderMusic(){
+  const lib = S.music || [], pj = S.project, sel = (pj.music || []).filter(id => lib.some(t => t.id === id));
+  $("#muLine").innerHTML = sel.length
+    ? `Musique : <b>${sel.map(id => esc(lib.find(t => t.id === id).name)).join(" → ")}</b> (boucle si la vidéo est plus longue)`
+    : lib.length ? "Pas de musique dans ce best-of : clique sur un titre pour l'ajouter (5 max)."
+    : "Aucune musique pour l'instant : ajoute des fichiers audio (mp3, m4a, wav…).";
+  $("#muLib").innerHTML = lib.map(t => { const k = sel.indexOf(t.id), on = au.dataset.id === t.id && !au.paused;
+    return `<div class="item${k >= 0 ? " on" : ""}">
+      <button data-mplay="${esc(t.id)}" title="${on ? "Arrêter" : "Écouter"}">${on ? "⏸" : "▶"}</button>
+      <div class="t" data-mpick="${esc(t.id)}" title="${k >= 0 ? "Retirer de ce best-of" : "Mettre dans ce best-of"}">
+        <div>${k >= 0 ? `<span class="badge">${k + 1}</span>` : ""}<b>${esc(t.name)}</b> <span class="muted">${fmt(t.dur)}</span></div></div>
+      <div class="acts"><button data-mbin="${esc(t.id)}" title="Supprimer cette musique">${ICON_BIN}</button></div></div>`; }).join("");
+  $("#muTr").checked = pj.transitions !== false;
+  $$("[data-mplay]").forEach(b => b.onclick = () => {
+    const t = lib.find(x => x.id === b.dataset.mplay);
+    if (au.dataset.id === t.id && !au.paused) return au.pause();
+    au.dataset.id = t.id; au.src = "/files/" + t.file; applyVol(); au.play().catch(() => toast("Lecture impossible"));
+  });
+  $$("[data-mpick]").forEach(d => d.onclick = () => {
+    const id = d.dataset.mpick;
+    if (sel.includes(id)) return saveProject({music: sel.filter(x => x !== id)});
+    if (sel.length >= 5) return toast("5 musiques au maximum par best-of");
+    saveProject({music: [...sel, id]});
+  });
+  $$("[data-mbin]").forEach(b => b.onclick = () => {
+    if (!binArmed(b, "Supprimer ?")) return;
+    if (au.dataset.id === b.dataset.mbin) au.pause();
+    api("/api/music/" + b.dataset.mbin + "/delete", {}).then(() => { toast("Musique supprimée"); refresh(); });
+  });
+}
+au.onplay = au.onpause = renderMusic;
+$("#muTr").onchange = () => saveProject({transitions: $("#muTr").checked});
+$("#muFile").onchange = async e => {  // une par une, un message par fichier
+  const fs = [...e.target.files]; e.target.value = "";
+  for (const f of fs) {
+    let r, j = {};
+    try { r = await fetch("/api/music/upload?" + new URLSearchParams({name: f.name}), {method:"POST", body:f, headers:{"X-User":encodeURIComponent(me)}}); }
+    catch (err) { toast("Échec de l'envoi de " + f.name); continue; }
+    try { j = await r.json(); } catch (err) {}
+    toast(r.ok ? "Musique ajoutée : " + j.name : j.error || "Échec de l'envoi de " + f.name);
+    if (r.ok) refresh();
+  }
+};
 // icônes dessinées (le « ＋ » pleine chasse n'était pas centré dans son rond)
 const ICON_PLUS = `<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v11M2.5 8h11" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>`;
 const ICON_BIN = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4M6.5 6.5v5M9.5 6.5v5"/></svg>`;
+function binArmed(b, label){  // poubelle en 2 clics : le 1er affiche label pendant 4 s, true au 2e
+  if (b.dataset.armed) return true;
+  b.dataset.armed = 1; b.textContent = label;
+  setTimeout(() => { if (b.isConnected && b.dataset.armed) { delete b.dataset.armed; b.innerHTML = ICON_BIN; } }, 4000);
+  return false;
+}
 function wireLists(){
   const ids = () => S.project.items.slice();
   $$("[data-add]").forEach(b => b.onclick = () => saveProject({items:[...ids(), b.dataset.add]}));
   $$("[data-rm]").forEach(b => b.onclick = () => saveProject({items:ids().filter(i => i !== b.dataset.rm)}));
   $$("[data-restore]").forEach(b => b.onclick = async () => { await api("/api/clip/"+b.dataset.restore, {status:"new"}); refresh(); });
   $$("[data-bin]").forEach(b => b.onclick = () => {  // 1er clic : « Poubelle ? », 2e clic : poubelle (récupérable jusqu'au prochain export)
-    if (!b.dataset.armed) { b.dataset.armed = 1; b.textContent = "Poubelle ?";
-      return setTimeout(() => { if (b.isConnected && b.dataset.armed) { delete b.dataset.armed; b.innerHTML = ICON_BIN; } }, 4000); }
+    if (!binArmed(b, "Poubelle ?")) return;
     api("/api/clip/" + b.dataset.bin, {status:"trash"}).then(() => { toast("À la poubelle (filtre « Poubelle » pour le récupérer avant le prochain export)"); refresh(); });
   });
   $$("[data-up],[data-down]").forEach(b => b.onclick = () => {
@@ -1284,7 +1362,8 @@ function wireLists(){
 $("#pName").onchange = () => saveProject({name:$("#pName").value});
 $("#pTarget").onchange = () => saveProject({target:Math.round(+$("#pTarget").value*60)});
 $("#pAuto").onclick = () => saveProject({auto:"order"});
-$("#pFill").onclick = () => saveProject({auto:"fill"});
+$("#pFill").onclick = async () => { await saveProject({auto:"fill"});
+  toast(`Best-of rempli : ${projItems().length} extraits, ${fmt(boTotal(projItems()))}`); };
 function confirmBtn(btn, label, fn){
   if (btn.dataset.armed){ delete btn.dataset.armed; btn.textContent = btn.dataset.orig; fn(); return; }
   btn.dataset.orig = btn.textContent; btn.dataset.armed = 1; btn.textContent = label;
@@ -1351,7 +1430,7 @@ $("#pPreview").onclick = () => {
   pl = flatPieces(projItems()); if (!pl.length) return toast("Le best-of est vide");
   pvTot = pl.reduce((a, e) => a + e.b - e.a, 0);
   $("#pvTotal").textContent = fmt(pvTot); $("#pvTime").textContent = "0:00"; $("#pvBar").style.width = "0";
-  delete pv.dataset.file; $("#mPrev").hidden = false; applyVol(); pvGo(0);
+  delete pv.dataset.file; $("#mPrev").hidden = false; au.pause(); applyVol(); pvGo(0);
 };
 $("#pvPrev").onclick = () => pvClip(-1);
 $("#pvNext").onclick = () => pvClip(1);
