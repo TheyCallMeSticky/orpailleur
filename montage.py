@@ -153,8 +153,8 @@ def description(db, durs=None):
             continue
         chapters.append((t, name))
     if len(chapters) >= 3:
-        L += ["Chapitres :"] + [f"{fmt(t)} {n}" for t, n in chapters] + [""]
-    L.append("Crédits : merci aux streamers ! Allez les suivre :")
+        L += ["Chapters:"] + [f"{fmt(t)} {n}" for t, n in chapters] + [""]
+    L.append("Credits: thanks to the streamers! Go follow them:")  # description YouTube en anglais
     seen = {}
     for _c, s, _t, _d in rows:  # un streamer par ligne, avec le lien de sa chaîne (les liens horodatés restent dans le CSV)
         seen.setdefault(s.get("streamer", "Inconnu"), s)
@@ -162,8 +162,8 @@ def description(db, durs=None):
         L.append(f"▶ {name}" + (f" — {s['streamer_url']}" if s.get("streamer_url") else ""))
     music = music_of(db)
     if music:
-        L += ["", "Musique : " + ", ".join(m["name"] for m in music)]
-    L += ["", "Abonne-toi pour le prochain best-of GTA 6 !"]
+        L += ["", "Music: " + ", ".join(m["name"] for m in music)]
+    L += ["", "Subscribe for the next GTA 6 best-of!"]
     return "\n".join(L) + "\n"
 
 

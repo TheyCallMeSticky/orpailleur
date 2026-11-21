@@ -275,7 +275,7 @@ with store.tx() as db:
 rec = montage.export(jobs.Job("export", "test", None, ()))
 sd = montage.stream_durs(store.DATA / rec["files"]["mp4"])
 assert abs(rec["dur"] - (21 - 2 * store.XT)) < .3 and abs(sd["audio"] - sd["video"]) < .1, (rec, sd)
-assert "Musique : Piste A, Piste B" in (store.DATA / rec["files"]["description"]).read_text("utf-8")
+assert "Music: Piste A, Piste B" in (store.DATA / rec["files"]["description"]).read_text("utf-8")
 assert not (store.DATA / rec["dir"] / "liste.txt").exists() and not (store.DATA / rec["dir"] / "musique.wav").exists()
 assert app.del_music(m2["id"]) and store.load()["project"]["music"] == [m1["id"]] and not (store.DATA / m2["file"]).exists()
 assert [m["id"] for m in store.load()["music"].values()] == [m1["id"]]
@@ -283,7 +283,7 @@ assert [m["id"] for m in store.load()["music"].values()] == [m1["id"]]
 # aucune musique choisie : tirée au hasard dans la bibliothèque à l'export et gardée dans le best-of ; case décochée : aucune
 app.patch_project({"music": []})
 rec = montage.export(jobs.Job("export", "test", None, ()))
-assert store.load()["project"]["music"] == [m1["id"]] and "Musique : Piste A" in (store.DATA / rec["files"]["description"]).read_text("utf-8")
+assert store.load()["project"]["music"] == [m1["id"]] and "Music: Piste A" in (store.DATA / rec["files"]["description"]).read_text("utf-8")
 app.patch_project({"music_on": False})
 assert montage.music_of(store.load()) == [] and store.load()["project"]["music_on"] is False
 app.patch_project({"music_on": True})
