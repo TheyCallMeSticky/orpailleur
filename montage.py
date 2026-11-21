@@ -14,7 +14,6 @@ import store
 from collect import fmt, probe, run, tools_check, ts_link
 
 FONT = store.ROOT / "fonts" / "Poppins-Bold.ttf"
-CHAPTER = {"FUN": "FUN", "WTF": "WTF", "FAIL": "FAILS", "EPIC": "EPIC"}
 
 
 def _key(c):
@@ -134,8 +133,11 @@ def _rows(db, durs=None):
 
 
 def music_of(db):
-    """Musiques choisies pour le best-of, dans l'ordre (celles supprimées de la bibliothèque sont ignorées)."""
+    """Musiques choisies pour le best-of, dans l'ordre (celles supprimées de la bibliothèque sont ignorées) ; aucune si la case
+    « Musique de fond » est décochée."""
     lib = db.get("music") or {}
+    if not db["project"].get("music_on", True):
+        return []
     return [lib[m] for m in db["project"].get("music") or [] if m in lib]
 
 
@@ -144,7 +146,7 @@ def description(db, durs=None):
     L = [db["project"]["name"], ""]
     chapters = []
     for k, (c, _s, t, d) in enumerate(rows):
-        name = "Intro" if not chapters else "Final" if k == len(rows) - 1 else CHAPTER.get(c.get("category"), "Moments")
+        name = "Intro" if not chapters else "Final" if k == len(rows) - 1 else _s.get("streamer") or "Moments"
         if chapters and chapters[-1][1] == name:
             continue
         if chapters and t - chapters[-1][0] < 10:   # YouTube : chaque chapitre doit durer au moins 10 s
@@ -154,13 +156,10 @@ def description(db, durs=None):
         L += ["Chapitres :"] + [f"{fmt(t)} {n}" for t, n in chapters] + [""]
     L.append("Crédits : merci aux streamers ! Allez les suivre :")
     seen = {}
-    for c, s, t, _d in rows:
-        seen.setdefault(s.get("streamer", "Inconnu"), (s, []))[1].append((c, t))
-    for name, (s, lst) in seen.items():
+    for _c, s, _t, _d in rows:  # un streamer par ligne, avec le lien de sa chaîne (les liens horodatés restent dans le CSV)
+        seen.setdefault(s.get("streamer", "Inconnu"), s)
+    for name, s in seen.items():
         L.append(f"▶ {name}" + (f" — {s['streamer_url']}" if s.get("streamer_url") else ""))
-        for c, t in lst:
-            if s.get("platform") != "local":
-                L.append(f"   {fmt(t)} dans la vidéo : {ts_link(s['url'], c['src_start'] + c['in'])}")
     music = music_of(db)
     if music:
         L += ["", "Musique : " + ", ".join(m["name"] for m in music)]
@@ -345,6 +344,11 @@ def export(job):
         segs.append((dst, c, s))
         durs.append(stream_durs(dst).get("video") or d)
     mp4 = out / f"{slug}.mp4"
+    if pj.get("music_on", True) and not music_of(db) and db.get("music"):  # aucune choisie : tirées au hasard, gardées pour le site
+        pj["music"] = random.sample(list(db["music"]), min(3, len(db["music"])))  # (copie locale : la description les cite)
+        with store.tx() as live:
+            live["project"]["music"] = list(pj["music"])
+        job.log("Aucune musique choisie : tirage au hasard dans la bibliothèque.")
     tr, music = pj.get("transitions", True) and len(segs) > 1, music_of(db)
     if tr and min(durs) < 2 * store.XT + .1:  # pas la place pour une transition à chaque bout d'un extrait si court
         tr = pj["transitions"] = False  # (copie locale : description et CSV sans transitions)
@@ -355,7 +359,7 @@ def export(job):
         if names:
             job.log(f"Transitions : 6 types, ordre aléatoire ({len(names)} × 0,4 s)")
         if music:
-            job.log("Musique : " + " → ".join(m["name"] for m in music) + f" (volume {pj.get('music_vol', 20)} %)")
+            job.log("Musique : " + " → ".join(m["name"] for m in music))
         assemble(job, mp4, [p for p, _c, _s in segs], durs, names, music, pj.get("music_vol", 20) / 100 * 1.75, fps,
                  conf.get("crf", 18))
     else:  # ni transition ni musique : les segments mis bout à bout sans réencodage

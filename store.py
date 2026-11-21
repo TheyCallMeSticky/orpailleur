@@ -42,7 +42,7 @@ def now():
 def new_project(n=1):
     # music : ids des musiques de fond dans l'ordre ; music_vol : volume en % ; transitions entre les extraits
     return {"id": uid(), "name": f"Best-of #{n}", "target": 600, "items": [], "created": now(),
-            "music": [], "music_vol": 20, "transitions": True}
+            "music": [], "music_vol": 20, "transitions": True, "music_on": True}
 
 
 def _empty():

@@ -461,6 +461,7 @@ th{color:var(--dim);font-weight:700;font-size:11.5px;text-transform:uppercase;le
       </div>
       <div class="row" style="margin-top:8px;gap:8px 24px">
         <span class="small muted">Le volume est automatique : la musique baisse quand le streamer parle.</span>
+        <label class="row small"><input type="checkbox" id="muOn"> Musique de fond</label>
         <label class="row small" title="Fondu, glissé, zoom, flash blanc, flou, pixels — dans un ordre aléatoire"><input type="checkbox" id="muTr"> Transitions entre les clips</label>
       </div>
       <p class="small muted" style="margin:10px 0 0">Musique libre de droits uniquement (bibliothèque audio de YouTube Studio, NCS…), sinon YouTube réclame les revenus de la vidéo.</p>
@@ -1283,10 +1284,11 @@ function renderBestof(){
 const au = $("#muAudio");
 function renderMusic(){
   const lib = S.music || [], pj = S.project, sel = (pj.music || []).filter(id => lib.some(t => t.id === id));
-  $("#muLine").innerHTML = sel.length
-    ? `Musique : <b>${sel.map(id => esc(lib.find(t => t.id === id).name)).join(" → ")}</b> (boucle si la vidéo est plus longue)`
-    : lib.length ? "Pas de musique dans ce best-of : clique sur un titre pour l'ajouter (5 max)."
+  $("#muLine").innerHTML = pj.music_on === false ? "Musique de fond coupée pour ce best-of."
+    : sel.length ? `Musique : <b>${sel.map(id => esc(lib.find(t => t.id === id).name)).join(" → ")}</b> (boucle si la vidéo est plus longue)`
+    : lib.length ? "Aucune choisie : 3 musiques de la bibliothèque seront tirées au hasard à l'export (clique sur un titre pour choisir)."
     : "Aucune musique pour l'instant : ajoute des fichiers audio (mp3, m4a, wav…).";
+  $("#muOn").checked = pj.music_on !== false;
   $("#muLib").innerHTML = lib.map(t => { const k = sel.indexOf(t.id), on = au.dataset.id === t.id && !au.paused;
     return `<div class="item${k >= 0 ? " on" : ""}">
       <button data-mplay="${esc(t.id)}" title="${on ? "Arrêter" : "Écouter"}">${on ? "⏸" : "▶"}</button>
@@ -1313,6 +1315,7 @@ function renderMusic(){
 }
 au.onplay = au.onpause = renderMusic;
 $("#muTr").onchange = () => saveProject({transitions: $("#muTr").checked});
+$("#muOn").onchange = () => saveProject({music_on: $("#muOn").checked});
 $("#muFile").onchange = async e => {  // une par une, un message par fichier
   const fs = [...e.target.files]; e.target.value = "";
   for (const f of fs) {

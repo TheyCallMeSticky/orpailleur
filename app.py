@@ -251,13 +251,16 @@ def patch_project(body):
             pj["music_vol"] = round(body["music_vol"])
         if isinstance(body.get("transitions"), bool):
             pj["transitions"] = body["transitions"]
+        if isinstance(body.get("music_on"), bool):
+            pj["music_on"] = body["music_on"]
         mode = body.get("auto")
         if mode == "order":
             pj["items"] = montage.auto_order([db["clips"][i] for i in pj["items"]], montage.streamer_of(db))
         elif mode == "fill":
             montage.fill(db)
         elif mode == "new":
-            db["archive"].append({k: pj.get(k) for k in ("id", "name", "items", "created", "music", "music_vol", "transitions")})
+            db["archive"].append({k: pj.get(k) for k in ("id", "name", "items", "created", "music", "music_vol", "transitions",
+                                                          "music_on")})
             for i in pj["items"]:
                 db["clips"][i]["used_in"] = db["clips"][i].get("used_in") or pj["name"]
             n = len(db["archive"]) + 1
@@ -299,6 +302,9 @@ def add_music(name, size, rfile, by=""):
          "added": store.now(), "by": by}
     with store.tx() as db:
         db["music"][mid] = t
+        pl = db["project"].setdefault("music", [])
+        if len(pl) < 5:  # envoyée = ajoutée au best-of en cours (un clic sur la musique l'en retire)
+            pl.append(mid)
     return t
 
 

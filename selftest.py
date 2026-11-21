@@ -229,13 +229,16 @@ assert set(montage.pick_transitions(6)) == set(montage.TRANSITIONS)
 
 # chapitres et crédits avec transitions : chaque extrait commence 0,4 s plus tôt
 d4 = {"project": {"name": "T", "items": ["c0", "c1", "c2", "c3"], "transitions": True}, "music": {},
-      "sources": {"s": {"streamer": "Kai", "url": "https://www.twitch.tv/videos/1", "platform": "twitch"}},
-      "clips": {f"c{k}": {"id": f"c{k}", "source_id": "s", "category": cat, "src_start": 0, "in": 0, "out": 20}
+      "sources": {f"s{k}": {"streamer": n, "url": "https://www.twitch.tv/videos/1", "platform": "twitch",
+                            "streamer_url": f"https://www.twitch.tv/{n.lower()}"} for k, n in enumerate(("Kai", "Lacy", "Jynxzi", "Kai"))},
+      "clips": {f"c{k}": {"id": f"c{k}", "source_id": f"s{k}", "category": cat, "src_start": 0, "in": 0, "out": 20}
                 for k, cat in enumerate(("FUN", "WTF", "FAIL", "EPIC"))}}
-assert "0:00 Intro\n0:20 WTF\n0:39 FAILS\n0:59 Final\n" in montage.description(d4) and "   0:59 dans la vidéo" in montage.description(d4)
+desc = montage.description(d4)  # chapitres au nom du streamer ; crédits : une ligne par streamer, sans liens horodatés
+assert "0:00 Intro\n0:20 Lacy\n0:39 Jynxzi\n0:59 Final\n" in desc and "dans la vidéo" not in desc, desc
+assert desc.count("▶ Kai — https://www.twitch.tv/kai") == 1 and "▶ Lacy — https://www.twitch.tv/lacy" in desc, desc
 assert abs(store.bestof_total(list(d4["clips"].values())) - 78.8) < 1e-9 and store.bestof_total(list(d4["clips"].values()), False) == 80
 d4["project"]["transitions"] = False
-assert "0:00 Intro\n0:20 WTF\n0:40 FAILS\n1:00 Final\n" in montage.description(d4)
+assert "0:00 Intro\n0:20 Lacy\n0:40 Jynxzi\n1:00 Final\n" in montage.description(d4)
 
 # musiques de fond : format, son et durée vérifiés à l'envoi (un fichier refusé est supprimé)
 import io  # noqa: E402
@@ -259,6 +262,7 @@ b1, b2 = tone(11, 440), tone(11, 660)
 m1, m2 = app.add_music("C:\\Musique\\Piste A.wav", len(b1), io.BytesIO(b1), "u"), app.add_music("Piste B.WAV", len(b2), io.BytesIO(b2))
 assert (m1["name"], m2["name"]) == ("Piste A", "Piste B") and abs(m1["dur"] - 11) < .2 and (store.DATA / m1["file"]).is_file(), m1
 assert [m["id"] for m in app.state()["music"]] == [m1["id"], m2["id"]]
+assert store.load()["project"]["music"] == [m1["id"], m2["id"]]  # envoyée = déjà dans le best-of en cours
 pj = app.patch_project({"music": [m1["id"], "zz", m2["id"], m1["id"]], "music_vol": 30, "transitions": True})
 assert (pj["music"], pj["music_vol"], pj["transitions"]) == ([m1["id"], m2["id"]], 30, True), pj
 
@@ -275,6 +279,14 @@ assert "Musique : Piste A, Piste B" in (store.DATA / rec["files"]["description"]
 assert not (store.DATA / rec["dir"] / "liste.txt").exists() and not (store.DATA / rec["dir"] / "musique.wav").exists()
 assert app.del_music(m2["id"]) and store.load()["project"]["music"] == [m1["id"]] and not (store.DATA / m2["file"]).exists()
 assert [m["id"] for m in store.load()["music"].values()] == [m1["id"]]
+
+# aucune musique choisie : tirée au hasard dans la bibliothèque à l'export et gardée dans le best-of ; case décochée : aucune
+app.patch_project({"music": []})
+rec = montage.export(jobs.Job("export", "test", None, ()))
+assert store.load()["project"]["music"] == [m1["id"]] and "Musique : Piste A" in (store.DATA / rec["files"]["description"]).read_text("utf-8")
+app.patch_project({"music_on": False})
+assert montage.music_of(store.load()) == [] and store.load()["project"]["music_on"] is False
+app.patch_project({"music_on": True})
 
 # ajout à la main « tel quel dans le Tri » (fichier local) : un passage = un extrait en tête du Tri ; > 30 min refusé
 long = store.TMP / "long.mp4"
