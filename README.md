@@ -164,7 +164,7 @@ NVIDIA (Mac), Whisper tourne sur le processeur avec un modèle plus petit : plus
 
 ```
 app.py            serveur web + API (bibliothèque standard Python), liens /files/ vers le stockage
-s3.py             stockage : liens signés S3 (OVH) ou mode local ; python s3.py setup | push
+s3.py             stockage : liens signés S3 (OVH) ou mode local ; python s3.py setup | push | backup (base du jour -> S3)
 vods.py           liste des VODs des streamers suivis
 collect.py        site : Claude, fiches des extraits ; moteur : détection, téléchargement des extraits, ajouts, « 30 s avant »
 ai.py             Whisper + Claude

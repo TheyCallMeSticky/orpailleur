@@ -2,7 +2,8 @@
 (media/clips/x.mp4…). Avec data/s3.json : S3 (OVH), le site ne fait que signer des liens et navigateurs / moteurs lisent et
 écrivent directement. Sans : mode local, les fichiers restent dans data/ et le site les sert (tests, fonctionnement sans S3).
   python s3.py setup                 clés S3 (la clé secrète en saisie masquée) -> data/s3.json, essai, CORS
-  python s3.py push DOSSIER PREFIXE  envoie un dossier vers S3 (migration : data/media media ; data/exports exports)"""
+  python s3.py push DOSSIER PREFIXE  envoie un dossier vers S3 (migration : data/media media ; data/exports exports)
+  python s3.py backup                copie du jour de la base et des réglages dans backups/<date>/ (minuteur quotidien du serveur)"""
 import datetime
 import hashlib
 import hmac
@@ -151,6 +152,22 @@ def push(folder, prefix):
     print(f"\n{len(files)} fichier(s) vérifié(s), {sent[0]} envoyé(s).")
 
 
+BACKUP = ("db.json", "config.json", "streamers.json", "clips_archive.jsonl")  # pas s3.json : les clés S3 restent sur le serveur
+
+
+def backup():
+    """Base et réglages du jour -> backups/<date>/. Hors des clés que le site sert ou signe (ROOTS) : config.json contient les
+    clés des machines. La base est écrite d'un coup par le site (os.replace) : la lire pendant qu'il tourne est sans risque."""
+    day = time.strftime("%Y-%m-%d")
+    for name in BACKUP:
+        p = store.DATA / name
+        if p.exists():
+            req = urllib.request.Request(presign("PUT", f"backups/{day}/{name}", 300), data=p.read_bytes(), method="PUT",
+                                         headers={"Content-Type": "application/octet-stream"})
+            urllib.request.urlopen(req, timeout=120).read()
+    print(f"Sauvegarde backups/{day}/ : " + ", ".join(n for n in BACKUP if (store.DATA / n).exists()))
+
+
 CORS = ("<CORSConfiguration><CORSRule><AllowedOrigin>*</AllowedOrigin><AllowedMethod>GET</AllowedMethod>"
         "<AllowedMethod>PUT</AllowedMethod><AllowedMethod>HEAD</AllowedMethod><AllowedHeader>*</AllowedHeader>"
         "<ExposeHeader>ETag</ExposeHeader><MaxAgeSeconds>3600</MaxAgeSeconds></CORSRule></CORSConfiguration>")
@@ -193,6 +210,10 @@ def setup():
 if __name__ == "__main__":
     if sys.argv[1:2] == ["setup"]:
         setup()
+    elif sys.argv[1:2] == ["backup"]:
+        if not conf():
+            sys.exit("Lance d'abord : python s3.py setup")
+        backup()
     elif sys.argv[1:2] == ["push"] and len(sys.argv) == 4:
         if not conf():
             sys.exit("Lance d'abord : python s3.py setup")
