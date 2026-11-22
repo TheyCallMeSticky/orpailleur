@@ -96,6 +96,15 @@ assert jobs.hms(65) == "1 min 05 s" and jobs.hms(3720) == "1 h 02 min"
 # filtre GTA : les hashtags ne comptent pas
 assert vods.title_gta("GTA 6 LIVE | Day 2") and not vods.title_gta("chain together live #shortslive #gta6")
 
+# streamers suivis : un clic ne change qu'une chaîne, sur la liste du moment (une page ancienne n'écrase rien)
+vods.save_settings({"streamers": [{"name": "A", "platform": "twitch", "handle": "a", "lang": "fr"},
+                                  {"name": "B", "platform": "kick", "handle": "b", "lang": "en"}, {"platform": "x", "handle": "c"}]})
+vods.save_settings({"op": {"action": "set", "platform": "kick", "handle": "B", "on": False}})
+vods.save_settings({"op": {"action": "add", "platform": "youtube", "handle": "@C", "name": "C"}})
+vods.save_settings({"op": {"action": "add", "platform": "twitch", "handle": "A"}})  # déjà suivie : rien
+f_ = vods.save_settings({"op": {"action": "remove", "platform": "twitch", "handle": "a"}})["streamers"]
+assert [(x["name"], x["lang"], x["on"]) for x in f_] == [("C", "", True), ("B", "en", False)], f_
+
 # liens horodatés des crédits
 assert collect.ts_link("https://www.twitch.tv/videos/1", 3725) == "https://www.twitch.tv/videos/1?t=1h2m5s"
 assert collect.ts_link("https://www.youtube.com/watch?v=x", 61) == "https://www.youtube.com/watch?v=x&t=61"
@@ -515,6 +524,13 @@ assert jx.status == "terminé" and store.load()["exports"][0]["dir"] == g["data"
 assert "addviadone" not in store.load()["clips"] and not (store.CLIPS / "addviadone.mp4").exists()
 assert (store.DATA / store.load()["exports"][0]["files"]["mp4"]).exists()
 assert collect.streamer_of({"channel": "xQc"}, "https://clips.twitch.tv/AwkwardHelplessSalamander")[1] == "https://www.twitch.tv/xqc"
+
+# onglet Streamers : gardés / jetés / à trier / exportés par streamer ; les jetés déjà supprimés (archivés) comptent aussi
+st_, db_ = app.streamer_stats(store.load()), store.load()
+assert sum(v["kept"] for v in st_.values()) == sum(c["status"] == "kept" for c in db_["clips"].values())
+assert sum(v["trash"] for v in st_.values()) == (sum(1 for _ in open(montage.ARCHIVE, encoding="utf-8"))
+                                                 + sum(c["status"] == "trash" for c in db_["clips"].values()))
+assert st_["kai"]["trash"] >= 1 and sum(v["used"] for v in st_.values()) == sum(bool(c.get("used_in")) for c in db_["clips"].values())
 
 shutil.rmtree(store.DATA, ignore_errors=True)
 print("selftest ok")

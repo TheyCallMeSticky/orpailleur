@@ -173,7 +173,7 @@ def get_source(db, url, m, override="", override_url=""):
     if override_url:
         link = override_url
     s = {"id": store.uid(), "url": url, "title": CTX.get("title") or m.get("title") or Path(url).name, "platform": platform(url),
-         "streamer": name, "streamer_url": link, "auth": "à demander", "duration": m.get("duration"), "added": store.now()}
+         "streamer": name, "streamer_url": link, "duration": m.get("duration"), "added": store.now()}
     if CTX.get("added_by"):  # vidéo ajoutée à la main depuis le dashboard
         s["added_by"] = CTX.get("added_by")
     db["sources"][s["id"]] = s

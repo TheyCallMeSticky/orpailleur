@@ -22,7 +22,6 @@ for _d in (CLIPS, THUMBS, EXPORTS, TMP, INBOX, MUSIC):
     _d.mkdir(parents=True, exist_ok=True)
 
 CATS = ("WTF", "FUN", "FAIL", "EPIC")
-AUTH = ("à demander", "demandée", "obtenue", "refusée")
 FLAGS = ("radio", "cinematic", "violence")
 DB = DATA / "db.json"
 CONF = DATA / "config.json"

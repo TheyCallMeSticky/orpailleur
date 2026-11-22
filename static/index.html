@@ -257,10 +257,14 @@ td,th{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vert
 tr:last-child td{border-bottom:0}
 tbody tr:hover td{background:#ffffff06}
 th{color:var(--dim);font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.7px}
-#srcT td:nth-child(2) a{color:var(--text)}
-#srcT td:nth-child(2) .muted{margin-top:2px}
-#srcT td:last-child{font:700 15px var(--head);text-align:center}
-#srcT th:last-child{text-align:center}
+#fList td.n,#fList th.n{text-align:right;font-variant-numeric:tabular-nums}
+#fList th[data-fs]{cursor:pointer;user-select:none}
+#fList th[data-fs]:hover,#fList th.sorted{color:var(--text)}
+#fList tr.off td{opacity:.45}
+#fList tr.off td:first-child{opacity:1}
+#fList a.x{color:var(--dim)}
+#fList a.x:hover{color:var(--err);text-decoration:none}
+#fList tr.flash td{animation:flash 1.6s ease-in-out 2}
 .tablewrap{overflow-x:auto}
 @keyframes flash{0%,100%{background:var(--panel2)}25%,75%{background:var(--accent);color:var(--ink)}}
 .flash{animation:flash 1.6s ease-in-out 2;outline:2px solid var(--accent)}
@@ -475,18 +479,13 @@ th{color:var(--dim);font-weight:700;font-size:11.5px;text-transform:uppercase;le
   <div class="panel" id="fBox">
     <h2>Streamers suivis <span class="muted small" id="fCount"></span></h2>
     <p class="small muted" style="margin-top:0">Leurs vidéos des dernières 24 h arrivent toutes seules dans l'onglet Vidéos.</p>
-    <div class="row follow" id="fList"></div>
+    <div class="tablewrap" id="fList"></div>
     <div class="row" style="margin-top:12px">
       <select id="fP"><option value="twitch">Twitch</option><option value="youtube">YouTube</option><option value="kick">Kick</option></select>
       <input type="text" id="fH" placeholder="pseudo (ex. gotaga, @Squeezie)" style="width:200px">
       <input type="text" id="fName" placeholder="nom affiché" style="width:140px">
       <button id="fAdd">Ajouter</button>
     </div>
-  </div>
-  <div class="panel">
-    <h2>Autorisations</h2>
-    <p class="small muted" style="margin-top:0">Pour publier, note si le streamer a autorisé l'utilisation de ses passages ; son nom et son lien servent aux crédits de la description YouTube.</p>
-    <div class="tablewrap"><table id="srcT"></table></div>
   </div>
 </section>
 
@@ -866,7 +865,7 @@ function render(){
   if (view === "machines") { renderMachines(); renderJobs(); }
   if (vodOpen && $("#mTrim").hidden) renderVod();
   if (view === "bestof") renderBestof();
-  if (view === "streamers") { renderFollow(); renderSources(); }
+  if (view === "streamers") renderFollow();
   if (view === "tri" && !cur && nNew) loadNext();
 }
 
@@ -1006,17 +1005,37 @@ function renderVods(){
 }
 
 /* ---------------- streamers suivis ---------------- */
+const shortUrl = u => String(u || "").replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");  // crédit de l'aperçu
+let fSort = store.get("bo_fs") || "kept";  // colonne de tri du tableau des streamers (clic sur l'en-tête)
+const chanUrl = s => s.platform === "twitch" ? "https://www.twitch.tv/" + s.handle : s.platform === "kick" ? "https://kick.com/" + s.handle
+  : "https://www.youtube.com/" + (s.handle.startsWith("@") ? s.handle : "@" + s.handle);
 function renderFollow(){
   const F = S.follow; if ($("#fBox").contains(document.activeElement) && document.activeElement.type === "text") return;
   $("#fCount").textContent = `(${F.streamers.filter(s => s.on).length} actifs sur ${F.streamers.length})`;
-  $("#fList").innerHTML = F.streamers.map((s,i) => `<label>
-    <input type="checkbox" data-fi="${i}" ${s.on ? "checked" : ""}> ${esc(s.name)} <span class="muted">${s.platform === "twitch" ? "Twitch" : s.platform === "youtube" ? "YT" : "Kick"}${s.lang ? " · " + esc(s.lang) : ""}</span>
-    <a href="#" data-fx="${i}" title="Retirer">✕</a></label>`).join("");
-  $$("[data-fi]").forEach(c => c.onchange = () => { F.streamers[+c.dataset.fi].on = c.checked; saveFollow(); });
-  $$("[data-fx]").forEach(a => a.onclick = e => { e.preventDefault(); F.streamers.splice(+a.dataset.fx, 1); saveFollow(); });
+  const z = {kept:0, trash:0, new:0, used:0};
+  const rows = F.streamers.map((s, i) => {
+    const n = S.stats[s.name.toLowerCase()] || S.stats[s.handle.toLowerCase().replace(/^@/, "")] || z;
+    return {s, i, ...n, pct: n.kept + n.trash ? Math.round(100 * n.kept / (n.kept + n.trash)) : -1};
+  });
+  const val = r => fSort === "name" ? r.s.name.toLowerCase() : fSort === "lang" ? r.s.lang || "~" : -r[fSort];
+  rows.sort((a, b) => (b.s.on - a.s.on) || (val(a) < val(b) ? -1 : val(a) > val(b) ? 1 : 0) || a.s.name.localeCompare(b.s.name));
+  const th = (k, label, num) => `<th${k ? ` data-fs="${k}"` : ""} class="${num ? "n" : ""}${k === fSort ? " sorted" : ""}">${label}${k === fSort ? " ▾" : ""}</th>`;
+  $("#fList").innerHTML = `<table><tr><th title="Suivi (décoché : plus de nouvelles VODs)">✓</th>${th("name", "Streamer")}<th>Plateforme</th>
+    ${th("lang", "Langue")}${th("kept", "Gardés", 1)}${th("trash", "Jetés", 1)}${th("pct", "% gardés", 1)}${th("new", "À trier", 1)}
+    ${th("used", "Exportés", 1)}<th></th></tr>` + rows.map(r => `<tr class="${r.s.on ? "" : "off"}" data-fr="${r.i}">
+    <td><input type="checkbox" data-fi="${r.i}" ${r.s.on ? "checked" : ""}></td>
+    <td><a href="${esc(chanUrl(r.s))}" target="_blank" rel="noopener"><b>${esc(r.s.name)}</b></a></td>
+    <td class="muted">${r.s.platform === "twitch" ? "Twitch" : r.s.platform === "youtube" ? "YouTube" : "Kick"}</td>
+    <td class="muted">${esc(r.s.lang || "?")}</td><td class="n">${r.kept}</td><td class="n">${r.trash}</td>
+    <td class="n">${r.pct < 0 ? "–" : r.pct + " %"}</td><td class="n">${r.new}</td><td class="n">${r.used}</td>
+    <td><a href="#" class="x" data-fx="${r.i}" title="Retirer de la liste">✕</a></td></tr>`).join("") + `</table>`;
+  $$("#fList th[data-fs]").forEach(h => h.onclick = () => { fSort = h.dataset.fs; store.set("bo_fs", fSort); renderFollow(); });
+  const op = (i, o) => ({op: {platform: F.streamers[i].platform, handle: F.streamers[i].handle, ...o}});  // une seule chaîne
+  $$("[data-fi]").forEach(c => c.onchange = () => saveFollow(op(+c.dataset.fi, {action: "set", on: c.checked})));
+  $$("[data-fx]").forEach(a => a.onclick = e => { e.preventDefault(); saveFollow(op(+a.dataset.fx, {action: "remove"})); });
 }
-async function saveFollow(){
-  S.follow = await api("/api/follow", {streamers:S.follow.streamers});
+async function saveFollow(body){
+  S.follow = await api("/api/follow", body);
   renderFollow(); toast("Liste enregistrée : clique « Actualiser » dans Vidéos pour relancer la recherche");
 }
 $("#fAdd").onclick = () => {
@@ -1024,40 +1043,14 @@ $("#fAdd").onclick = () => {
   const k = h.toLowerCase().replace(/^@/, "");
   const dup = S.follow.streamers.findIndex(s => s.platform === $("#fP").value && s.handle.toLowerCase().replace(/^@/, "") === k);
   if (dup >= 0) {  // déjà suivi : on le montre au lieu de l'ajouter une 2e fois
-    const chip = $(`#fList [data-fi="${dup}"]`).closest("label");
+    const chip = $(`#fList tr[data-fr="${dup}"]`);
     chip.classList.remove("flash"); void chip.offsetWidth; chip.classList.add("flash");
     chip.scrollIntoView({behavior: "smooth", block: "center"});
     return toast(S.follow.streamers[dup].name + " est déjà suivi");
   }
-  S.follow.streamers.unshift({platform:$("#fP").value, handle:h, name:$("#fName").value.trim() || h.replace(/^@/, ""), lang:"", on:true});
-  $("#fH").value = $("#fName").value = ""; saveFollow();
+  const add = {action: "add", platform: $("#fP").value, handle: h, name: $("#fName").value.trim() || h.replace(/^@/, ""), on: true};
+  $("#fH").value = $("#fName").value = ""; saveFollow({op: add});
 };
-
-/* ---------------- autorisations (sources) ---------------- */
-let srcEdit = null;
-const shortUrl = u => String(u || "").replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
-function renderSources(){
-  const t = $("#srcT"), a = document.activeElement;
-  if (a && t.contains(a) && /^(INPUT|SELECT)$/.test(a.tagName)) return;  // ne pas effacer une saisie en cours
-  const cnt = id => S.clips.filter(c => c.source_id === id && c.status === "kept").length;
-  t.innerHTML = `<tr><th>Streamer</th><th>Vidéo</th><th>Autorisation</th><th>Crédits</th><th>Gardés</th></tr>` +
-    S.sources.slice().sort((a,b) => b.added.localeCompare(a.added)).map(s => `<tr data-s="${s.id}">
-      <td><b>${esc(s.streamer || "?")}</b></td>
-      <td class="small">${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title || "(sans titre)")}</a>` : esc(s.title || "")}
-        <div class="muted">${esc(s.platform || "")} · ${esc((s.added || "").slice(0, 10))}</div></td>
-      <td><select data-k="auth">${S.auth.map(a => `<option ${a===s.auth?"selected":""}>${esc(a)}</option>`).join("")}</select></td>
-      <td class="small">${srcEdit === s.id
-        ? `<div class="row"><input type="text" data-k="streamer" value="${esc(s.streamer)}" placeholder="nom" style="width:130px">
-           <input type="text" data-k="streamer_url" value="${esc(s.streamer_url)}" placeholder="lien de la chaîne" style="width:220px">
-           <button class="small" data-done>OK</button></div>`
-        : `${s.streamer_url ? `<a href="${esc(s.streamer_url)}" target="_blank" rel="noopener">${esc(shortUrl(s.streamer_url))}</a>` : `<span class="muted">aucun lien</span>`}
-           · <a href="#" data-edit="${s.id}">modifier</a>`}</td>
-      <td>${cnt(s.id)}</td></tr>`).join("");
-  t.querySelectorAll("[data-k]").forEach(i => i.onchange = async () => {
-    await api("/api/source/" + i.closest("tr").dataset.s, {[i.dataset.k]: i.value}); toast("Enregistré"); refresh(); });
-  t.querySelectorAll("[data-edit]").forEach(a => a.onclick = e => { e.preventDefault(); srcEdit = a.dataset.edit; renderSources(); });
-  t.querySelectorAll("[data-done]").forEach(b => b.onclick = () => { srcEdit = null; renderSources(); });
-}
 
 /* ---------------- machines, réglages, journal ---------------- */
 const ASK = {stop_now: n => `Arrêter « ${n} » maintenant ? Les fichiers en cours repartent en file.`,

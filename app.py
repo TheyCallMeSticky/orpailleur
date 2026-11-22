@@ -1,6 +1,7 @@
 """Dashboard best-of : python app.py [--port 8765] [--host 127.0.0.1]
 Accès protégé par un lien privé (?k=jeton, voir data/config.json). Pour donner accès à ton pote : voir README.md."""
 import argparse
+import collections
 import json
 import mimetypes
 import os
@@ -36,7 +37,7 @@ def state():
         return {"clips": list(db["clips"].values()), "sources": list(db["sources"].values()), "project": db["project"],
                 "archive": db["archive"][-20:], "exports": db["exports"][:20], "warnings": montage.warnings(db),
                 "music": list(db["music"].values()),  # dans l'ordre d'ajout
-                "jobs": jobs.listing(), "cats": store.CATS, "auth": store.AUTH,
+                "jobs": jobs.listing(), "cats": store.CATS, "stats": streamer_stats(db),
                 "settings": {k: CONF[k] for k in SETTINGS},
                 "vods": vod_rows(db), "vods_scan": db.get("vods_scan"), "follow": vods.settings(),
                 "machines": engines.machines_view(), "engine_conf": engines.engine_conf(), "hub_version": engines.VERSION,
@@ -44,6 +45,32 @@ def state():
 
 
 SETTINGS = ("fps", "lower_third", "max_moments", "ai")
+_ARCH = [None, {}]  # (date de l'archive, {streamer: extraits jetés archivés}) : relue seulement quand elle change
+
+
+def streamer_stats(db):
+    """Par streamer (nom en minuscules) : extraits gardés, jetés (poubelle + ceux déjà supprimés, archivés), à trier, utilisés
+    dans un export."""
+    p = montage.ARCHIVE
+    m = p.stat().st_mtime if p.exists() else 0
+    if m != _ARCH[0]:
+        cnt = collections.Counter()
+        if p.exists():
+            with p.open(encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        cnt[str(json.loads(line).get("streamer") or "").lower()] += 1
+                    except ValueError:
+                        pass
+        _ARCH[:] = [m, cnt]
+    out = collections.defaultdict(lambda: {"kept": 0, "trash": 0, "new": 0, "used": 0})
+    for c in db["clips"].values():
+        d = out[str((db["sources"].get(c["source_id"]) or {}).get("streamer") or "").lower()]
+        d[c["status"]] = d.get(c["status"], 0) + 1
+        d["used"] += bool(c.get("used_in"))
+    for n, k in _ARCH[1].items():
+        out[n]["trash"] += k
+    return out
 
 
 def vod_rows(db):
@@ -317,19 +344,6 @@ def del_music(mid):
     return {"ok": True}
 
 
-def patch_source(sid, body):
-    with store.tx() as db:
-        s = db["sources"].get(sid)
-        if not s:
-            raise KeyError("source introuvable")
-        for k in ("streamer", "streamer_url"):
-            if isinstance(body.get(k), str):
-                s[k] = body[k].strip()[:200]
-        if body.get("auth") in store.AUTH:
-            s["auth"] = body["auth"]
-        return s
-
-
 def check_add(mode, window):
     if mode not in (None, "whole", "auto"):
         raise ValueError("mode inconnu")
@@ -586,8 +600,6 @@ class H(BaseHTTPRequestHandler):
                 return self.send_json(engines.add_task("extend", f"30 s avant : {d['streamer'] or d['cid']}", d, m).view())
             if method == "POST" and path.startswith("/api/clip/"):
                 return self.send_json(patch_clip(path.rsplit("/", 1)[1], self.body(), self.user()))
-            if method == "POST" and path.startswith("/api/source/"):
-                return self.send_json(patch_source(path.rsplit("/", 1)[1], self.body()))
             if method == "POST" and path == "/api/project":
                 return self.send_json(patch_project(self.body()))
             if method == "POST" and path == "/api/export":  # fabriqué par un PC : celui de la personne, sinon le premier en ligne
@@ -605,6 +617,8 @@ class H(BaseHTTPRequestHandler):
                 if "lower_third" in b:
                     CONF["lower_third"] = bool(b["lower_third"])
                 if "ai" in b:
+                    if bool(b["ai"]) != CONF.get("ai", True):  # trace : sans IA, ni Whisper ni Claude (extraits sans avis)
+                        print(f"  Réglage IA {'activé' if b['ai'] else 'DÉSACTIVÉ'} par {self.user()}", flush=True)
                     CONF["ai"] = bool(b["ai"])
                 if isinstance(b.get("max_moments"), int) and 1 <= b["max_moments"] <= 50:
                     CONF["max_moments"] = b["max_moments"]

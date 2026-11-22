@@ -105,10 +105,6 @@ def warnings(db):
     cine = [i + 1 for i, c in enumerate(cs) if (c.get("flags") or {}).get("cinematic")]
     if cine:
         w.append("Cinématique / fin de l'histoire dans les extraits n° " + ", ".join(map(str, cine)) + " : Rockstar fait retirer ces vidéos.")
-    no_auth = sorted({db["sources"][c["source_id"]]["streamer"] for c in cs
-                      if db["sources"].get(c["source_id"], {}).get("auth") != "obtenue"})
-    if no_auth:
-        w.append("Autorisation pas encore obtenue : " + ", ".join(no_auth) + " (onglet Streamers).")
     return w
 
 
@@ -172,11 +168,11 @@ def sources_csv(db, durs=None):
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(["N°", "Créateur", "Chaîne", "Plateforme", "Source (horodatée)", "Catégorie", "Note", "Durée",
-                "Début dans le best-of", "Autorisation", "Pourquoi détecté"])
+                "Début dans le best-of", "Pourquoi détecté"])
     for i, (c, s, t, d) in enumerate(_rows(db, durs), 1):
         w.writerow([i, s.get("streamer", ""), s.get("streamer_url", ""), s.get("platform", ""),
                     ts_link(s.get("url", ""), c["src_start"] + c["in"]), c.get("category") or "", c.get("rating") or "",
-                    fmt(d), fmt(t), s.get("auth", ""), c.get("why", "")])
+                    fmt(d), fmt(t), c.get("why", "")])
     return "﻿" + buf.getvalue()   # BOM : accents corrects dans Excel / Google Sheets
 
 

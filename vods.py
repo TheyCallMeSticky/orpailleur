@@ -39,21 +39,40 @@ def settings():
     return d
 
 
+def _clean(s):
+    """Une chaîne envoyée par le dashboard -> fiche propre, ou None si la plateforme ou le pseudo sont invalides."""
+    h, p = str(s.get("handle", "")).strip(), s.get("platform")
+    if p not in ("twitch", "youtube", "kick") or not re.fullmatch(r"@?[\w.\-]{1,60}", h):
+        return None
+    return {"name": str(s.get("name") or h).strip()[:60], "platform": p, "handle": h, "lang": str(s.get("lang") or "")[:5],
+            "on": bool(s.get("on", True))}
+
+
+def _key(s):
+    return s.get("platform"), str(s.get("handle", "")).strip().lower().lstrip("@")
+
+
 def save_settings(body):
+    """{"streamers": [...]} remplace la liste ; {"op": {"action": "set"|"add"|"remove", "platform", "handle", ...}} change UNE
+    chaîne dans la liste du moment (une page ouverte depuis longtemps n'écrase plus les changements faits ailleurs)."""
     cur = settings()
     if isinstance(body.get("streamers"), list):
         clean, seen = [], set()
         for s in body["streamers"]:
-            h = str(s.get("handle", "")).strip()
-            p = s.get("platform")
-            key = (p, h.lower().lstrip("@"))
-            if key in seen:  # même chaîne ajoutée deux fois : on garde la première
-                continue
-            seen.add(key)
-            if p in ("twitch", "youtube", "kick") and re.fullmatch(r"@?[\w.\-]{1,60}", h):
-                clean.append({"name": str(s.get("name") or h).strip()[:60], "platform": p, "handle": h,
-                              "lang": str(s.get("lang") or "")[:5], "on": bool(s.get("on", True))})
+            c = _clean(s) if isinstance(s, dict) else None
+            if c and _key(c) not in seen:  # même chaîne ajoutée deux fois : on garde la première
+                seen.add(_key(c))
+                clean.append(c)
         cur["streamers"] = clean
+    op = body.get("op")
+    if isinstance(op, dict):
+        hit = next((s for s in cur["streamers"] if _key(s) == _key(op)), None)
+        if op.get("action") == "remove":
+            cur["streamers"] = [s for s in cur["streamers"] if s is not hit]
+        elif op.get("action") == "add" and not hit and _clean(op):
+            cur["streamers"].insert(0, _clean(op))
+        elif op.get("action") == "set" and hit:
+            hit["on"] = bool(op.get("on"))
     FILE.write_text(json.dumps(cur, ensure_ascii=False, indent=1), "utf-8")
     return cur
 
@@ -75,12 +94,20 @@ BASIC = '{user(login:%s){login displayName videos(first:5,type:ARCHIVE,sort:TIME
 
 
 def twitch_vods(login, name=None):
-    j = gql(RICH % json.dumps(login.lower()))
-    if j.get("errors"):  # un champ refusé par l'API : on retombe sur la requête minimale du repo
-        j = gql(BASIC % json.dumps(login.lower()))
-    u = (j.get("data") or {}).get("user")
-    if not u:
-        raise RuntimeError("chaîne introuvable")
+    # depuis le serveur (datacenter), Twitch répond « service error » sur les vidéos environ une fois sur deux, au hasard
+    # (mesuré le 2026-11-22) : une nouvelle tentative passe presque toujours
+    for _ in range(6):
+        j = gql(RICH % json.dumps(login.lower()))
+        if j.get("errors"):  # un champ refusé par l'API : on retombe sur la requête minimale du repo
+            j = gql(BASIC % json.dumps(login.lower()))
+        u = (j.get("data") or {}).get("user")
+        if not u:
+            raise RuntimeError("chaîne introuvable")
+        if u.get("videos"):
+            break
+        time.sleep(2)
+    else:
+        raise RuntimeError("Twitch ne répond pas (« service error ») : nouvel essai à la prochaine recherche")
     out = []
     for e in u["videos"]["edges"]:
         n = e["node"]
