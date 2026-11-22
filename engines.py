@@ -277,7 +277,17 @@ def result(name, b):
                 return {"ok": False, "error": "perdu"}
             vod = dict(db["vods"][url])
         LEASES.pop(lid, None)
-        err, code = _s(b.get("error")) or "échec sans message", b.get("code") if b.get("code") in ("restricted", "vertical") else None
+        err, code = _s(b.get("error")) or "échec sans message", b.get("code") if b.get("code") in ("restricted", "vertical", "live") else None
+        if not code and "Ce stream est en direct" in err:  # shortcut: moteurs pas encore relancés depuis le code « live », à retirer ensuite
+            code = "live"
+        if code == "live":  # ni échec ni pause de la machine : la VOD sort de la file jusqu'à la prochaine recherche des VODs
+            with store.tx() as db:
+                v = (db.get("vods") or {}).get(url)
+                if v:
+                    v["recording"] = True
+                if url in db.get("pending", []):
+                    db["pending"].remove(url)
+            return {"ok": True}
         if b.get("ok") is True:
             try:
                 res = _clean(b.get("result"))
@@ -539,6 +549,14 @@ def _h_add(j, task, r):
 
 HANDLERS = {"clips": _h_clips, "add": _h_add, "extend": lambda j, task, r: collect.extended(task["data"], r.get("out") or {}),
             "export": lambda j, task, r: montage.save(j, task["data"], r.get("out") or {})}
+
+
+def no_pc():
+    """Pourquoi aucun PC ne peut prendre l'export / « 30 s avant » (message affiché tel quel)."""
+    paused = [m["name"] for m in machines_view() if m["online"] and m["paused"]]
+    if paused:
+        return f"PC en pause : {', '.join(paused)}. Onglet Machines > Reprendre, puis réessaie."
+    return "Aucun PC allumé : lance le moteur sur ton PC (ou demande à un ami), puis réessaie."
 
 
 def export_machine(ip):

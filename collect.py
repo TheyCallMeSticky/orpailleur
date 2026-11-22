@@ -65,7 +65,8 @@ def ytdlp(*a):
 
 
 class Skip(RuntimeError):
-    """VOD à écarter pour de bon. code = "restricted" (réservée aux abonnés) | "vertical" (format Shorts)."""
+    """VOD à écarter. code = "restricted" (réservée aux abonnés) | "vertical" (format Shorts) | "live" (stream encore en
+    direct : seulement pour l'instant)."""
     def __init__(self, code, msg):
         super().__init__(msg)
         self.code = code
@@ -587,8 +588,8 @@ def detect_vod(job, inp, max_n, taken, ai_on):
     """Point d'entrée du moteur : lecture du lien puis détection (chat, audio, Whisper). Réservée aux abonnés -> Skip."""
     with job.step("Lecture du lien"):
         m = meta(inp)
-    if m.get("is_live") or m.get("live_status") == "is_live":
-        raise RuntimeError("Ce stream est en direct : attends la VOD (rediffusion) pour l'analyser.")
+    if m.get("is_live") or m.get("live_status") == "is_live":  # pas un échec : la VOD sera reprise quand le live sera fini
+        raise Skip("live", "Stream encore en direct : la VOD sera analysée quand il sera fini.")
     return detect(job, inp, m, max_n, "", taken, True, None, ai_on)
 
 

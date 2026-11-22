@@ -214,6 +214,18 @@ E.control("m", "stop_now")
 g = E.beat("m", B(want=1, jobs=[{"lease": L, "url": U}]))
 assert g["kill"] == [L] and g["paused"] and not g["give"] and U in store.load()["pending"]
 assert E.result("m", {"lease": L, "url": U, "ok": False}) == {"ok": False, "error": "perdu"}
+# stream encore en direct : ni échec compté ni pause de la machine, la VOD attend la prochaine recherche
+E.control("m", "resume")
+with store.tx() as db:
+    db["pending"] = [U]
+for _ in range(4):
+    with store.tx() as db:
+        db["pending"] = [U]
+        db["vods"][U].pop("recording", None)
+    Lv = E.beat("m", B(want=1))["give"][0]["lease"]
+    assert E.result("m", {"lease": Lv, "url": U, "ok": False, "code": "live", "error": "en direct"})["ok"]
+st_ = store.load()
+assert not st_["engines"]["m"]["paused"] and U not in st_["pending"] and U not in st_.get("vod_fails", {}) and st_["vods"][U]["recording"]
 
 # tâches des moteurs : « 30 s avant » d'abord, machine visée (sauf si elle ne répond plus), place libre seulement pour une
 # analyse, liens signés limités aux fichiers de la tâche, reprise après un redémarrage du site

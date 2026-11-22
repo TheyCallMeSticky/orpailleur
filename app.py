@@ -582,7 +582,7 @@ class H(BaseHTTPRequestHandler):
                 d = collect.extend_request(path.split("/")[3])
                 m = engines.export_machine(self.ip())  # le PC de la personne d'abord, comme pour l'export
                 if not m:
-                    return self.send_json({"error": "Aucun PC allumé : lance le moteur sur ton PC, puis réessaie."}, 400)
+                    return self.send_json({"error": engines.no_pc()}, 400)
                 return self.send_json(engines.add_task("extend", f"30 s avant : {d['streamer'] or d['cid']}", d, m).view())
             if method == "POST" and path.startswith("/api/clip/"):
                 return self.send_json(patch_clip(path.rsplit("/", 1)[1], self.body(), self.user()))
@@ -593,7 +593,7 @@ class H(BaseHTTPRequestHandler):
             if method == "POST" and path == "/api/export":  # fabriqué par un PC : celui de la personne, sinon le premier en ligne
                 m = engines.export_machine(self.ip())
                 if not m:
-                    return self.send_json({"error": "Aucun PC allumé : lance le moteur sur ton PC (ou demande à un ami), puis réessaie."}, 400)
+                    return self.send_json({"error": engines.no_pc()}, 400)
                 d = montage.snapshot()
                 j = engines.add_task("export", f"{d['db']['project']['name']} — sur {m}", d, m)
                 j.log(f"Demandé depuis {self.ip()} : export sur {m}")
