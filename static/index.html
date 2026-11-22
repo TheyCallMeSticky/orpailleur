@@ -376,7 +376,7 @@ th{color:var(--dim);font-weight:700;font-size:11.5px;text-transform:uppercase;le
       <div class="cats" id="tcats"></div>
       <div class="rate wait" id="trate"></div>
       <div class="tacts">
-        <button id="tTrash">✕ Poubelle <kbd>X</kbd></button>
+        <button id="tTrash">✕ Poubelle <kbd>X</kbd> <kbd>0</kbd></button>
         <button id="tLater">Plus tard <kbd>↓</kbd></button>
         <button id="tUndo">⟲ Annuler <kbd>Z</kbd></button>
       </div>
@@ -1256,7 +1256,7 @@ document.addEventListener("keydown", e => {
     e.preventDefault(); sel.cat = cur.ai.category; sel.rating = sel.rating || cur.ai.rating || 3; return commit(); }
   if (CAT_KEYS[k]) return chooseCat(CAT_KEYS[k]);
   if (DIGIT[e.code]) return chooseRating(DIGIT[e.code]);
-  const f = {x:trash, z:undo, backspace:undo, arrowdown:later}[k] || VOL_KEYS[k];
+  const f = (e.code === "Numpad0" ? trash : 0) || {x:trash, z:undo, backspace:undo, arrowdown:later}[k] || VOL_KEYS[k];  // 0 du pavé, avec ou sans Verr Num
   if (f) return run(f);
   if (cur && tEd.key(k)) e.preventDefault();
 });

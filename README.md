@@ -156,7 +156,7 @@ NVIDIA (Mac), Whisper tourne sur le processeur avec un modèle plus petit : plus
 | `Q`/`A`, `S`, `D`, `F` | WTF, FUN, FAIL, EPIC |
 | `1` à `5` | note (valide et passe au suivant) |
 | `Entrée` | valide la proposition de Claude |
-| `X` / `↓` / `Z` | poubelle / plus tard / annuler |
+| `X` ou `0` du pavé numérique / `↓` / `Z` | poubelle / plus tard / annuler |
 | `I` / `O` | début / fin à la position actuelle (ou boutons ±1 s, ou bords de la barre) |
 | `K` / `Suppr` | couper le morceau ici / supprimer le morceau choisi |
 | `Espace`, `←` `→`, `M`, `+` `−` | pause, ±3 s, muet, volume |
