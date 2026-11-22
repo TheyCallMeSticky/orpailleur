@@ -20,8 +20,8 @@ import store
 
 sys.path.insert(0, str(store.ROOT / "vendor" / "gta6clipper"))
 
-PAD = 8              # secondes téléchargées en plus après l'extrait (pour pouvoir l'élargir au réglage)
-PAD_BEFORE = 30      # et avant : la réaction du streamer et du chat arrive après l'action, la mise en place est souvent avant
+PAD = 8              # secondes téléchargées en plus de chaque côté (pour pouvoir élargir l'extrait au réglage)
+EXTRA_BEFORE = 30    # bouton « Récupérer 30 s avant » : quand l'action commence avant l'extrait
 MIN_LEN, MAX_LEN = 12, 60
 CLIP_MAX = 150       # une vidéo plus courte est importée telle quelle (c'est déjà un clip)
 WHOLE_MAX = 1800     # « Mettre directement dans le Tri » : 30 min au plus (sinon un passage, ou la recherche des meilleurs moments)
@@ -621,6 +621,44 @@ def import_clip(job, url, m, streamer, window="", local=None):
     return 1
 
 
+def extend_before(cid, extra=EXTRA_BEFORE):
+    """Retélécharge un extrait avec `extra` s de plus au début (même fin) ; ses réglages (début, fin, morceaux) sont décalés
+    d'autant pour rester sur les mêmes images. -> (fiche à jour, secondes ajoutées)."""
+    with store.lock:
+        db = store.load()
+        c = dict(db["clips"][cid])  # KeyError -> 404
+        src = dict(db["sources"].get(c["source_id"]) or {})
+        dl = (db.get("vods", {}).get(src.get("url")) or {}).get("dl_url")  # Kick : le flux vidéo, s'il est encore connu
+    url = dl or src.get("url") or ""
+    s0, s1 = max(0.0, c["src_start"] - extra), c["src_start"] + c["file_dur"]
+    if c["src_start"] - s0 < 1:
+        raise ValueError("L'extrait commence déjà au tout début de la vidéo.")
+    name = f"{cid}-{store.uid()[:4]}"  # nouveau nom : le navigateur ne ressert pas l'ancienne vidéo depuis son cache
+    try:
+        if not re.match(r"https?://", url):
+            f = cut_local(url, name, s0, s1)
+        elif platform(url) in ("twitch", "kick") or ".m3u8" in url:
+            f, s0 = hls_section(url, name, s0, s1)  # s0 = début réel (début du 1er morceau de 10 s)
+        else:
+            f = download(url, name, s0, s1)
+        d = probe(f)["dur"]
+    except Exception as e:  # noqa: BLE001 - VOD supprimée, réseau… : l'extrait garde son fichier actuel
+        raise ValueError(f"Récupération impossible ({str(e)[:150]}) : l'extrait reste tel quel.") from None
+    delta = c["src_start"] - s0
+    with store.tx() as db:
+        c = db["clips"][cid]
+        old = store.DATA / c["file"]
+        sh = lambda x: round(x + delta, 2)  # noqa: E731
+        c.update({"src_start": round(s0, 2), "file": f"media/clips/{Path(f).name}", "file_dur": round(d, 2),
+                  "in": sh(c["in"]), "out": sh(c["out"])})
+        if c.get("segs"):
+            c["segs"] = [[sh(a), sh(b)] for a, b in c["segs"]]
+        c = dict(c)
+    if old != Path(f):
+        old.unlink(missing_ok=True)
+    return c, delta
+
+
 def taken_for(db, url):
     """Passages déjà pris d'une source : extraits existants + poubelle supprimée à l'export. [] si la source est inconnue."""
     src = next((s for s in db["sources"].values() if s["url"] == url), None)
@@ -724,7 +762,7 @@ def finish(job, url, res, max_n, streamer="", local=None, machine=""):
     errs = []
 
     def fetch_one(i, g):
-        s0, s1 = max(0.0, g["t0"] - PAD_BEFORE), g["t1"] + PAD
+        s0, s1 = max(0.0, g["t0"] - PAD), g["t1"] + PAD
         if dur:
             s1 = min(dur, s1)
         cid = store.uid()

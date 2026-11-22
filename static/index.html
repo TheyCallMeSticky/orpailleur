@@ -695,6 +695,7 @@ const ED_TOOLS = `<div class="row ecut">
     <button data-a="out" title="Le morceau finit ici">Fin ici <kbd>O</kbd></button>
     <button data-a="cut" title="Sépare le morceau en deux ici">✂ Couper ici <kbd>K</kbd></button>
     <button data-a="del" title="Enlève le morceau choisi">Supprimer ce morceau <kbd>Suppr</kbd></button>
+    <button data-a="more" title="Quand l'action commence avant l'extrait : le retélécharge avec 30 s de plus au début (tes réglages sont gardés)">⏪ Récupérer 30 s avant</button>
   </div>
   <div class="row enudge">
     <span class="row"><span class="small muted">Début</span><button data-a="in-" title="Commencer 1 s plus tôt">−1 s</button><b class="einv"></b><button data-a="in+" title="Commencer 1 s plus tard">+1 s</button></span>
@@ -763,7 +764,18 @@ function makeEditor(root, loop, tools = root){
     if (!c) return; if (sg.length < 2) return toast("Il faut garder au moins un morceau");
     sg = sg.filter((_, k) => k !== sel); sel = Math.min(sel, sg.length - 1); free = false; draw();
   }
-  const ACT = {play: toggle, back: () => seek(T() - 3), fwd: () => seek(T() + 3), in: () => edgeHere(0), out: () => edgeHere(1), cut, del,
+  async function more(){  // retélécharge l'extrait avec 30 s de plus au début ; les réglages en cours suivent le décalage
+    if (!c) return; const b = q("[data-a=more]"), id = c.id; b.disabled = true; toast("Récupération des 30 s d'avant…");
+    try {
+      const r = await api("/api/clip/" + id + "/extend", {});
+      if (!c || c.id !== id) return;  // on est passé à un autre extrait entre-temps
+      const d = r.delta;
+      load({...c, ...r.clip, segs: sg.map(([x, y]) => [r2(x + d), r2(y + d)])}, false);
+      seek(Math.max(0, sg[0][0] - d)); play();  // on joue depuis le début de ce qui vient d'être ajouté
+      toast(`${Math.round(d)} s ajoutées avant : élargis le début (−1 s ou en tirant le bord rose)`);
+    } catch (e) { /* message déjà affiché */ } finally { b.disabled = false; }
+  }
+  const ACT = {play: toggle, back: () => seek(T() - 3), fwd: () => seek(T() + 3), in: () => edgeHere(0), out: () => edgeHere(1), cut, del, more,
     "in-": () => nudge(0, -1), "in+": () => nudge(0, 1), "out-": () => nudge(1, -1), "out+": () => nudge(1, 1)};
   [root, tools].forEach(el => el.querySelectorAll("[data-a]").forEach(b => b.onclick = ACT[b.dataset.a]));
 

@@ -535,6 +535,9 @@ class H(BaseHTTPRequestHandler):
                                                 "" if self.user() == "?" else self.user()))
             if method == "POST" and re.fullmatch(r"/api/music/\w+/delete", path):
                 return self.send_json(del_music(path.split("/")[3]))
+            if method == "POST" and path.startswith("/api/clip/") and path.endswith("/extend"):  # « Récupérer 30 s avant »
+                c, delta = collect.extend_before(path.split("/")[3])
+                return self.send_json({"clip": c, "delta": round(delta, 2)})
             if method == "POST" and path.startswith("/api/clip/"):
                 return self.send_json(patch_clip(path.rsplit("/", 1)[1], self.body(), self.user()))
             if method == "POST" and path.startswith("/api/source/"):

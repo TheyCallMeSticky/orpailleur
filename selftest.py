@@ -118,6 +118,15 @@ assert src["analyses"][0]["steps"][0] == ["Whisper", 9] and collect.taken_for(st
 # finalisation reprise après un arrêt du hub (même résultat une 2e fois) : rien n'est retéléchargé, pas de doublon dans le Tri
 n_clips = len(store.load()["clips"])
 assert collect.finish(jd, url, res, 2, "Kai") == 0 and len(store.load()["clips"]) == n_clips
+# « Récupérer 30 s avant » : 30 s de plus au début, même fin, réglages décalés pour rester sur les mêmes images
+f0 = collect.cut_local(str(vid), "ext0", 40, 55)
+with store.tx() as db:
+    db["sources"]["loc"] = {"id": "loc", "url": str(vid), "platform": "local", "streamer": "L"}
+    db["clips"]["ext0"] = {"id": "ext0", "source_id": "loc", "status": "new", "file": f"media/clips/{f0.name}", "src_start": 40,
+                           "in": 2, "out": 10, "segs": [[2, 5], [7, 10]], "file_dur": 15.0}
+ce, delta = collect.extend_before("ext0")
+assert delta == 30 and ce["src_start"] == 10 and (ce["in"], ce["out"]) == (32, 40) and ce["segs"] == [[32, 35], [37, 40]], ce
+assert abs(ce["file_dur"] - 45) < .5 and not f0.exists() and (store.DATA / ce["file"]).exists(), ce
 try:
     collect.detect(jd, url, {"duration": 60, "width": 1080, "height": 1920}, 2, "", [])
     raise AssertionError("vidéo verticale acceptée")
