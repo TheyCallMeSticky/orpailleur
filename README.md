@@ -138,7 +138,8 @@ Après chaque modification du code : `git add . && git commit -m "…" && git pu
 
 ### Inviter un ami
 
-Onglet **Machines** > **Inviter un ami** : tape son prénom, **Créer le message**, **Copier le message**, et envoie-le-lui en privé.
+Onglet **Machines** > **Inviter un ami** : tape son prénom, puis **Avec sa machine** (il trie et fait tourner un moteur) ou
+**Tri seulement** (Tailscale et le lien pour trier, aucune machine créée), **Copier le message**, et envoie-le-lui en privé.
 Le message contient tout : Tailscale et ton lien d'invitation, la ligne à coller sur Windows (PowerShell) ou Mac (Terminal), le
 lien pour trier. Un message par ami (il contient la clé de sa machine) ; **Message** sur une machine le réaffiche. Les réglages
 (adresse Tailscale, dépôt GitHub, lien d'invitation) se remplissent une fois dans **Réglages** ; un lien d'invitation Tailscale

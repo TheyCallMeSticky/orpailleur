@@ -604,6 +604,13 @@ def _message(name, tok):
             "invite": CONF.get("invite", "")}
 
 
+def sort_message():
+    """Message pour quelqu'un qui trie seulement (aucune machine créée) : Tailscale, l'invitation, le lien de tri."""
+    if not CONF.get("public_url"):
+        raise ValueError("Renseigne d'abord l'adresse Tailscale du serveur (Réglages).")
+    return {"sort": f"{CONF['public_url']}/?k={CONF['token']}", "invite": CONF.get("invite", "")}
+
+
 def machine_message(name):
     """Le message d'une machine déjà créée (perdu, ou à renvoyer)."""
     tok = next((k for k, m in CONF.get("machines", {}).items() if m["name"] == name and not m.get("local")), None)

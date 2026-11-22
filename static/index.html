@@ -508,10 +508,11 @@ th{color:var(--dim);font-weight:700;font-size:11.5px;text-transform:uppercase;le
     <div class="stack">
       <div class="panel">
         <h2>Inviter un ami</h2>
-        <p class="small muted" style="margin-top:0">Tape son prénom : le site prépare tout le message à lui envoyer (Tailscale,
-          installation du moteur sur Windows ou Mac, lien pour trier). Un message par ami : il contient la clé de sa machine.</p>
+        <p class="small muted" style="margin-top:0">Tape son prénom, puis : <b>Avec sa machine</b> (Tailscale, installation du
+          moteur sur Windows ou Mac, lien pour trier ; un message par ami, il contient la clé de sa machine) ou <b>Tri seulement</b>
+          (Tailscale et le lien pour trier). Avant chaque nouvelle personne : un nouveau lien d'invitation Tailscale dans Réglages.</p>
         <div class="row"><input type="text" id="maNew" placeholder="prénom (ex. Jean)" style="flex:1">
-          <button class="primary" id="maAdd">Créer le message</button></div>
+          <button class="primary" id="maAdd">Avec sa machine</button><button id="maSort">Tri seulement</button></div>
         <div id="maOut"></div>
       </div>
       <div class="panel">
@@ -1089,10 +1090,12 @@ function renderMachines(){
     await api("/api/machines/control", {name, action}); refresh(); });
   $$("[data-msg]").forEach(b => b.onclick = async () => showMsg(await api("/api/machines/message", {name:b.dataset.msg})));
 }
-function showMsg(r){  // le message complet pour l'ami, prêt à copier-coller
+function showMsg(r, sortOnly){  // le message complet pour l'ami, prêt à copier-coller ; sortOnly : sans moteur
   const hub = r.sort.split("/?")[0];  // adresse du site (Tailscale), sans la clé de tri
-  const msg = `Salut ! Voilà comment faire tourner le moteur d'analyse sur ton PC (une seule fois, environ 15 min) :
-
+  const head = sortOnly ? `Salut ! Voilà comment venir trier les extraits du best-of avec moi (une seule fois, 5 min) :
+` : `Salut ! Voilà comment faire tourner le moteur d'analyse sur ton PC (une seule fois, environ 15 min) :
+`;
+  const msg = head + `
 1) Installe Tailscale : https://tailscale.com/download
    Ouvre-le et connecte-toi (avec ton compte Google, c'est le plus simple).
 
@@ -1103,7 +1106,9 @@ function showMsg(r){  // le message complet pour l'ami, prêt à copier-coller
    Tu dois voir une page « Accès privé ».
    Si la page ne s'ouvre pas : clique sur l'icône Tailscale à côté de l'horloge (parfois cachée sous la petite flèche ^),
    choisis le réseau de l'invitation (pas le tien), il doit dire « Connected ». Puis réessaie.
-
+` + (sortOnly ? `
+4) Ouvre ce lien pour trier (garde-le pour toi, ensuite l'adresse ci-dessus suffit dans ce navigateur) :
+   ${r.sort}` : `
 4) Installe le moteur :
    - Windows : appuie sur la touche Windows, tape PowerShell, Entrée, colle cette ligne puis Entrée :
      ${r.win}
@@ -1114,8 +1119,8 @@ function showMsg(r){  // le message complet pour l'ami, prêt à copier-coller
 5) Les fois suivantes : double-clic sur « Moteur Best-of » sur ton Bureau. Laisse la fenêtre ouverte (tu peux la réduire),
    ferme-la pour l'arrêter. Il se met à jour tout seul. Évite juste que ton PC se mette en veille pendant que ça tourne.
 
-6) Pour trier les extraits avec moi : ${r.sort}`;
-  $("#maOut").innerHTML = `<div class="why" style="margin-top:10px"><b>Message pour « ${esc(r.name)} »</b>
+6) Pour trier les extraits avec moi : ${r.sort}`);
+  $("#maOut").innerHTML = `<div class="why" style="margin-top:10px"><b>Message pour « ${esc(r.name)} »${sortOnly ? " (tri seulement)" : ""}</b>
     <textarea id="maMsg" readonly rows="26" style="width:100%;margin-top:6px;font-size:13px"></textarea>
     <div class="row" style="margin-top:6px"><button class="primary" id="maCopy">Copier le message</button>
       <span class="small muted">Envoie-le en privé.</span></div></div>`;
@@ -1136,6 +1141,12 @@ $("#maAdd").onclick = async () => {
   $("#maNew").value = "";
   showMsg(r);
   refresh();
+};
+$("#maSort").onclick = async () => {
+  const name = $("#maNew").value.trim(); if (!name) return toast("Tape son prénom (ex. Jean)");
+  const r = await api("/api/invite/sort", {});
+  $("#maNew").value = "";
+  showMsg({...r, name}, true);
 };
 $("#sAi").onchange = async () => { S.settings = await api("/api/settings", {ai:$("#sAi").checked});
   toast($("#sAi").checked ? "IA activée : Claude choisit les moments" : "IA désactivée : sélection automatique"); };
