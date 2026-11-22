@@ -14,6 +14,7 @@ import store
 from collect import fmt, probe, run, tools_check, ts_link
 
 FONT = store.ROOT / "fonts" / "Poppins-Bold.ttf"
+ARCHIVE = store.DATA / "clips_archive.jsonl"  # fiches des extraits jetés, gardées après suppression de leur vidéo
 
 
 def _key(c):
@@ -119,14 +120,14 @@ def credit(s):
 
 
 def _rows(db, durs=None):
-    """[(clip, source, start_in_bestof, dur)] dans l'ordre du best-of (avec transitions : chaque extrait commence 0,4 s plus tôt)."""
+    """[(clip, source, start_in_bestof, dur)] dans l'ordre du best-of. Avec transitions, chaque segment déborde de 0,4 s avant
+    et après la sélection et chevauche le suivant de 0,4 s."""
     out, t = [], 0.0
     xt = store.XT if db["project"].get("transitions", True) else 0
-    for cid in db["project"]["items"]:
-        c = db["clips"].get(cid)
-        if not c:
-            continue
-        d = durs[len(out)] if durs else store.cdur(c)
+    items = [cid for cid in db["project"]["items"] if cid in db["clips"]]
+    for k, cid in enumerate(items):
+        c = db["clips"][cid]
+        d = durs[k] if durs else store.cdur(c) + (xt if k else 0) + (xt if k < len(items) - 1 else 0)
         out.append((c, db["sources"].get(c["source_id"], {}), t, d))
         t += d - xt
     return out
@@ -255,7 +256,52 @@ def music_bed(dst, music, total, vol):
          "-map", "[out]", "-c:a", "pcm_s16le", dst])
 
 
-def assemble(job, mp4, files, durs, names, music, vol, fps, crf):
+END_S = 20  # écran de fin : la durée maximale des éléments de fin YouTube
+END_IMG = store.ROOT / "images" / "Banière.png"  # bannière de la chaîne (16:9)
+
+
+def end_card(dst, fps):
+    """Écran de fin : la bannière de la chaîne en zoom lent, « Thanks for watching ». YouTube y pose ses éléments de fin
+    (vidéos, abonnement) sans cacher le dernier clip. Son : silence (la musique de fond continue par-dessus)."""
+    tf = dst.with_suffix(".txt")
+    tf.write_text("THANKS FOR WATCHING!  SUBSCRIBE FOR MORE", "utf-8")
+    vf = (f"zoompan=z='1+0.06*on/{END_S * fps}':x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2':d=1:s=1920x1080:fps={fps},"
+          f"drawtext=fontfile='{FONT}':textfile='{tf}':x=(w-text_w)/2:y=70:fontsize=64:fontcolor=white:"
+          f"shadowcolor=black@0.7:shadowx=4:shadowy=4,format=yuv420p")
+    run(["ffmpeg", "-v", "error", "-y", "-loop", "1", "-framerate", str(fps), "-i", END_IMG, "-f", "lavfi", "-i",
+         "anullsrc=r=48000:cl=stereo", "-vf", vf, "-t", str(END_S), "-map", "0:v", "-map", "1:a", "-c:v", "libx264", "-preset", "fast",
+         "-crf", "18", "-g", str(fps * 2), "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", dst])
+
+
+def _pill(w, h, alpha):
+    """Masque de transparence d'une pilule w×h (bouts en demi-cercle, bord lissé) pour geq."""
+    r = h / 2
+    d = f"hypot(max(max({r}-X,X-({w - r}))\\,0)\\,{r}-Y)"  # distance au centre du demi-cercle le plus proche (0 au milieu)
+    return f"clip(({r}-{d}+0.5)*{alpha}\\,0\\,{alpha})"
+
+
+def subscribe_banner(dst):
+    """Bandeau « Like • Subscribe • Comment » avec le logo : une pilule à bord rose, à la largeur du texte, posée en bas au
+    centre au début de la vidéo."""
+    tf = dst.with_suffix(".txt")
+    tf.write_text("LIKE  •  SUBSCRIBE  •  COMMENT", "utf-8")
+    text = f"drawtext=fontfile='{FONT}':textfile='{tf}':fontsize=46:fontcolor=white"
+    box = subprocess.run(["ffmpeg", "-v", "info", "-f", "lavfi", "-i", "color=c=black:s=2400x120", "-vf", f"{text}:x=0:y=30,bbox",
+                          "-frames:v", "1", "-f", "null", "-"], capture_output=True, text=True).stderr
+    m = re.search(r"x1:(\d+) x2:(\d+)", box)  # largeur réelle du texte, mesurée sur un rendu (pas d'espace vide après « COMMENT »)
+    tw = int(m.group(2)) - int(m.group(1)) + 1 if m else 640
+    h, logo, gap, pad = 110, 80, 22, 44
+    w = (h - logo) // 2 + logo + gap + tw + pad
+    run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", f"color=c=0xFD1FB0:s={w}x{h},format=rgba", "-f", "lavfi", "-i",
+         f"color=c=0x180224:s={w - 8}x{h - 8},format=rgba", "-i", store.ROOT / "static" / "logo.png", "-filter_complex",
+         f"[0]geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='{_pill(w, h, 255)}'[edge];"
+         f"[1]geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='{_pill(w - 8, h - 8, 235)}'[in];"
+         f"[2]scale={logo}:{logo},format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':"  # logo rond : rien ne dépasse de l'arrondi
+         f"a='clip(({logo / 2}-hypot(X-{logo / 2 - .5}\\,Y-{logo / 2 - .5})+0.5)*255\\,0\\,255)'[l];[edge][in]overlay=4:4[b];[b][l]overlay={(h - logo) // 2}:{(h - logo) // 2},"
+         f"{text}:x={(h - logo) // 2 + logo + gap}:y=(h-text_h)/2", "-frames:v", "1", dst])
+
+
+def assemble(job, mp4, files, durs, names, music, vol, fps, crf, banner=None):
     """Une passe sur tous les segments : transitions xfade (names, une par raccord) ou simple mise bout à bout, musique de fond
     baissée par la voix des streamers, encodage par la carte graphique (NVENC), sinon par le processeur."""
     n, xt = len(files), store.XT
@@ -278,6 +324,12 @@ def assemble(job, mp4, files, durs, names, music, vol, fps, crf):
         fc += [f"{a}asplit=2[voix][sc]", f"[{n}:a][sc]sidechaincompress=threshold=0.02:ratio=10:attack=20:release=350[md]",
                "[voix][md]amix=inputs=2:duration=first:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000[ao]"]
         a = "[ao]"
+    if banner and total > 12:  # de 0:05 à 0:10, en bas au centre, au-dessus de la barre de progression de YouTube
+        b = len(inputs) // 2
+        inputs += ["-loop", "1", "-i", banner]
+        fc += [f"[{b}:v]format=rgba,fade=in:st=5:d=0.4:alpha=1,fade=out:st=9.6:d=0.4:alpha=1[bn]",
+               f"{v}[bn]overlay=(W-w)/2:H-h-130:enable='between(t,5,10)':shortest=1[vb]"]
+        v = "[vb]"
     cmd = ["ffmpeg", "-v", "error", "-y", *inputs, "-filter_complex", ";".join(fc), "-map", v, "-map", a]
     out = ["-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", mp4]
     try:
@@ -304,6 +356,10 @@ def export(job):
     segdir.mkdir(parents=True)
     job.log(f"Export de {len(clips)} extraits en 1920×1080 {fps} i/s, son normalisé à -14 LUFS")
     segs, durs = [], []
+    tr_on = pj.get("transitions", True) and len(clips) > 1
+    if tr_on and min(store.cdur(c) for c in clips) < 2 * store.XT + .1:  # pas la place pour une transition à chaque bout
+        tr_on = pj["transitions"] = False  # (copie locale : description et CSV sans transitions)
+        job.log("Transitions désactivées : un extrait dure moins d'une seconde.")
     for i, c in enumerate(clips, 1):
         s = db["sources"].get(c["source_id"], {})
         src = store.DATA / c["file"]
@@ -318,26 +374,38 @@ def export(job):
             tf.write_text(label, "utf-8")
             vf += (f",drawtext=fontfile='{FONT}':textfile='{tf}':x=40:y=40:fontsize=34:fontcolor=white:"
                    f"box=1:boxcolor=black@0.5:boxborderw=12")
-        af = f"loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000,afade=t=in:d=0.05,afade=t=out:st={max(0, d - .08):.3f}:d=0.08"
-        has_audio, pieces = probe(src)["audio"], store.segs(c)
+        p = probe(src)
+        has_audio, pieces, jn = p["audio"], [list(x) for x in store.segs(c)], store.joins(store.segs(c))
+        # fondus pris hors de la sélection : chaque morceau déborde de son fondu dans la partie coupée, et l'extrait de 0,4 s
+        # avant / après pour les transitions avec ses voisins (moins si le fichier n'a pas assez de marge)
+        lead = min(store.XT, pieces[0][0]) if tr_on and i > 1 else 0
+        tail = (min(store.XT, max(0.0, (p["dur"] or c.get("file_dur") or 0) - pieces[-1][1]))
+                if tr_on and (i < len(clips) or END_IMG.exists()) else 0)  # le dernier enchaîne sur l'écran de fin
+        pieces[0][0] -= lead
+        pieces[-1][1] += tail
+        for k, x in enumerate(jn):
+            pieces[k][1] += x
+            pieces[k + 1][0] -= x
+        seglen = d + lead + tail
+        af = f"loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000,afade=t=in:d=0.05,afade=t=out:st={max(0, seglen - .08):.3f}:d=0.08"
         silence = [] if has_audio else ["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"]  # extrait sans son : silence
         if len(pieces) == 1:
-            cmd = ["ffmpeg", "-v", "error", "-y", "-ss", f"{c['in']:.3f}", "-i", src, *silence, "-t", f"{d:.3f}", "-map", "0:v:0",
-                   "-map", "0:a:0" if has_audio else "1:a:0", "-vf", vf, "-af", af]
+            cmd = ["ffmpeg", "-v", "error", "-y", "-ss", f"{pieces[0][0]:.3f}", "-i", src, *silence, "-t", f"{seglen:.3f}",
+                   "-map", "0:v:0", "-map", "0:a:0" if has_audio else "1:a:0", "-vf", vf, "-af", af]
         else:  # extrait coupé : ses morceaux reliés par un léger fondu (image + son), puis la même mise en forme
             fc = "".join(f"[0:v]trim=start={a:.3f}:end={b:.3f},setpts=PTS-STARTPTS,fps={fps},settb=AVTB[v{k}];"
                          for k, (a, b) in enumerate(pieces))
             if has_audio:
                 fc += "".join(f"[0:a]atrim=start={a:.3f}:end={b:.3f},asetpts=PTS-STARTPTS[a{k}];" for k, (a, b) in enumerate(pieces))
             v, a_, L = "[v0]", "[a0]", pieces[0][1] - pieces[0][0]
-            for k, x in enumerate(store.joins(pieces), 1):  # fondu k entre les morceaux k-1 et k : ils se chevauchent de x s
+            for k, x in enumerate(jn, 1):  # fondu k entre les morceaux k-1 et k : ils se chevauchent de x s
                 fc += f"{v}[v{k}]xfade=transition=fade:duration={x:.3f}:offset={L - x:.3f}[x{k}];"
                 if has_audio:
                     fc += f"{a_}[a{k}]acrossfade=d={x:.3f}[y{k}];"
                 v, a_, L = f"[x{k}]", f"[y{k}]", L + pieces[k][1] - pieces[k][0] - x
             fc += f"{v}{vf}[vo];[{a_.strip('[]') if has_audio else '1:a'}]{af}[ao]"
             cmd = ["ffmpeg", "-v", "error", "-y", "-i", src, *silence, "-filter_complex", fc, "-map", "[vo]", "-map", "[ao]",
-                   "-t", f"{d:.3f}"]
+                   "-t", f"{seglen:.3f}"]
         cmd += ["-c:v", "libx264", "-preset", "fast", "-crf", str(conf.get("crf", 18)), "-g", str(fps * 2),
                 "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", dst]
         run(cmd)
@@ -349,23 +417,23 @@ def export(job):
         with store.tx() as live:
             live["project"]["music"] = list(pj["music"])
         job.log("Aucune musique choisie : tirage au hasard dans la bibliothèque.")
-    tr, music = pj.get("transitions", True) and len(segs) > 1, music_of(db)
-    if tr and min(durs) < 2 * store.XT + .1:  # pas la place pour une transition à chaque bout d'un extrait si court
-        tr = pj["transitions"] = False  # (copie locale : description et CSV sans transitions)
-        job.log("Transitions désactivées : un extrait dure moins d'une seconde.")
+    tr, music = tr_on, music_of(db)
     job.log("Assemblage…")
-    if tr or music:
-        names = pick_transitions(len(segs) - 1) if tr else []
-        if names:
-            job.log(f"Transitions : 6 types, ordre aléatoire ({len(names)} × 0,4 s)")
-        if music:
-            job.log("Musique : " + " → ".join(m["name"] for m in music))
-        assemble(job, mp4, [p for p, _c, _s in segs], durs, names, music, pj.get("music_vol", 20) / 100 * 1.75, fps,
-                 conf.get("crf", 18))
-    else:  # ni transition ni musique : les segments mis bout à bout sans réencodage
-        lst = out / "liste.txt"
-        lst.write_text("".join("file '" + str(p).replace("'", "'\\''") + "'\n" for p, _c, _s in segs), "utf-8")
-        run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-c", "copy", "-movflags", "+faststart", mp4])
+    files, all_durs = [p for p, _c, _s in segs], list(durs)
+    names = pick_transitions(len(segs) - 1) if tr else []
+    if names:
+        job.log(f"Transitions : 6 types, ordre aléatoire ({len(names)} × 0,4 s)")
+    if music:
+        job.log("Musique : " + " → ".join(m["name"] for m in music))
+    if END_IMG.exists():  # écran de fin de 20 s, en fondu après le dernier clip
+        ec = segdir / "99_ecran_de_fin.mp4"
+        end_card(ec, fps)
+        files.append(ec)
+        all_durs.append(stream_durs(ec).get("video") or END_S)
+        names += ["fade"] if tr else []
+    banner = segdir / "bandeau_subscribe.png"
+    subscribe_banner(banner)
+    assemble(job, mp4, files, all_durs, names, music, pj.get("music_vol", 20) / 100 * 1.75, fps, conf.get("crf", 18), banner)
     (out / f"{slug}.fcpxml").write_text(fcpxml(pj["name"], [(p, round(d * fps), c, s) for (p, c, s), d in zip(segs, durs)], fps), "utf-8")
     (out / "description_youtube.txt").write_text(description(db, durs), "utf-8")
     (out / "sources.csv").write_text(sources_csv(db, durs), "utf-8")
@@ -387,9 +455,15 @@ def export(job):
 
 
 def purge_trash(db, ids):
-    """Après un export : les extraits à la poubelle sont supprimés pour de bon (vidéo, vignette, fiche). Leur passage reste
-    noté dans la source (« trashed ») pour qu'une réanalyse ne le repropose pas. -> (nombre, octets libérés)"""
+    """Après un export : la vidéo et la vignette des extraits à la poubelle sont supprimées ; leur fiche part dans
+    data/clips_archive.jsonl (pour apprendre de vos choix) et leur passage reste noté dans la source (« trashed ») pour
+    qu'une réanalyse ne le repropose pas. -> (nombre, octets libérés)"""
     gone, size = [c for c in db["clips"].values() if c["status"] == "trash" and c["id"] in ids], 0
+    with ARCHIVE.open("a", encoding="utf-8") as arch:
+        for c in gone:
+            s = db["sources"].get(c["source_id"]) or {}
+            arch.write(json.dumps({**c, **{k: s.get(k) for k in ("streamer", "title", "url", "platform")}, "purged": store.now()},
+                                  ensure_ascii=False) + "\n")
     for c in gone:
         for rel in (c.get("file"), c.get("thumb")):
             f = store.DATA / rel if rel else None

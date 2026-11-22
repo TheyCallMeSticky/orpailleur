@@ -220,8 +220,9 @@ def patch_clip(cid, body, user):
             c["rating"] = body["rating"]
         if isinstance(body.get("flags"), dict):
             c["flags"] = {k: bool(v) for k, v in body["flags"].items() if k in store.FLAGS}
-        if "note" in body:
+        if "note" in body and str(body["note"])[:500] != c.get("note", ""):
             c["note"] = str(body["note"])[:500]
+            c["note_by"] = user if c["note"] else None  # qui a écrit la note (plusieurs personnes trient)
         if pieces:
             c["in"], c["out"] = pieces[0][0], pieces[-1][1]
             if len(pieces) > 1:

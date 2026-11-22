@@ -77,8 +77,12 @@ import store  # noqa: E402
 db = {"sources": {"s1": {}}, "clips": {"t1": {"id": "t1", "source_id": "s1", "status": "trash", "src_start": 100, "in": 8, "out": 30,
                                               "file": "media/clips/t1.mp4", "thumb": ""},
                                        "k1": {"id": "k1", "source_id": "s1", "status": "kept", "file": "media/clips/k1.mp4"}}}
+db["sources"]["s1"]["streamer"] = "Kai"
+db["clips"]["t1"]["ai"] = {"category": "FAIL", "rating": 4, "reason": "r"}
 assert montage.purge_trash(db, {"t1", "k1"}) == (1, 100) and list(db["clips"]) == ["k1"] and db["sources"]["s1"]["trashed"] == [[108, 130]]
 assert not (store.CLIPS / "t1.mp4").exists()
+arch = [json.loads(x) for x in montage.ARCHIVE.read_text("utf-8").splitlines()]  # la fiche est gardée, sans la vidéo
+assert arch[-1]["id"] == "t1" and arch[-1]["ai"]["category"] == "FAIL" and arch[-1]["streamer"] == "Kai" and arch[-1]["purged"], arch
 
 # journal sur disque avec la durée de chaque étape
 import jobs  # noqa: E402
@@ -99,7 +103,7 @@ assert collect.ts_link("https://www.youtube.com/watch?v=x", 61) == "https://www.
 import shutil  # noqa: E402
 import subprocess  # noqa: E402
 vid = store.TMP / "test.mp4"
-subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=30", "-t", "30", str(vid)], check=True)
+subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=30", "-t", "60", str(vid)], check=True)  # 30 s de marge avant chaque extrait
 collect.chat_signals = lambda job, url, m, lo, hi: [sig(100, 120, "chat", 1.0, "chat x2")]
 collect.audio_signals = lambda job, key, lo, hi, *a: [sig(500, 510, "audio", .7, "audio rires 0.7")]
 collect.download = lambda url, cid, s0=None, s1=None: shutil.copy(vid, store.CLIPS / f"{cid}.mp4")
@@ -171,9 +175,9 @@ with store.tx() as db:
     db["sources"]["sc"] = {"id": "sc", "url": "u-cut", "streamer": "Geo", "streamer_url": "https://www.twitch.tv/geo"}
     db["clips"]["cut"] = {"id": "cut", "source_id": "sc", "status": "new", "in": 2.0, "out": 20.0, "file_dur": 30.0, "added": store.now()}
 c = app.patch_clip("cut", {"segs": [[20, 40], [5, 10], [8, 12], [-3, 1], [15, 15.2]]}, "u")
-assert c["segs"] == [[0, 1], [5, 12], [20, 30]] and (c["in"], c["out"]) == (0, 30) and store.cdur(c) == 18 - 2 * store.XF, c
+assert c["segs"] == [[0, 1], [5, 12], [20, 30]] and (c["in"], c["out"]) == (0, 30) and store.cdur(c) == 18 + 2 * store.XF, c  # fondus pris dans les parties coupées : ils allongent
 c = app.patch_clip("cut", {"in": 6, "out": 25}, "u")  # ancien réglage début/fin : rogne les morceaux
-assert c["segs"] == [[6, 12], [20, 25]] and store.cdur(c) == 11 - store.XF, c  # fondu entre les 2 morceaux
+assert c["segs"] == [[6, 12], [20, 25]] and store.cdur(c) == 11 + store.XF, c  # fondu entre les 2 morceaux
 c = app.patch_clip("cut", {"segs": [[0, 5], [5, 8]]}, "u")
 assert "segs" not in c and (c["in"], c["out"]) == (0, 8) and store.cdur(c) == 8, c
 for bad in ([], [[3, 3.1]], [["a", 2]], "x"):
@@ -201,7 +205,7 @@ with store.tx() as db:
 row = app.vod_rows(store.load())[0]
 assert abs(row["ended"] - (time.time() - 7200)) < 5 and row["day"] == store.day(row["ended"]), row
 
-# export d'un extrait coupé en 2 morceaux (avec son, puis sans son) : un seul segment = morceaux - fondu de 0,25 s entre eux
+# export d'un extrait coupé en 2 morceaux (avec son, puis sans son) : un seul segment = morceaux + fondu de 0,25 s pris dans la coupure
 av = store.TMP / "av.mp4"
 subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=30", "-f", "lavfi", "-i",
                 "sine=frequency=440:sample_rate=48000", "-t", "30", "-shortest", "-c:a", "aac", str(av)], check=True)
@@ -217,9 +221,9 @@ app.patch_clip("av", {"segs": [[2, 5], [10, 14]]}, "u")
 app.patch_clip("mute", {"segs": [[1, 3], [20, 23.5]]}, "u")
 rec = montage.export(jobs.Job("export", "test", None, ()))
 seg = sorted((store.DATA / rec["dir"] / "segments").glob("*.mp4"))
-assert [abs(collect.probe(f)["dur"] - d) < .2 for f, d in zip(seg, (6.75, 5.25))] == [True, True], [collect.probe(f) for f in seg]
-assert all(collect.probe(f)["audio"] for f in seg) and abs(rec["dur"] - 12.0) < .3, rec
-assert (store.DATA / rec["dir"] / "liste.txt").exists()  # ancien chemin (copie)
+assert [abs(collect.probe(f)["dur"] - d) < .2 for f, d in zip(seg, (7.25, 5.75))] == [True, True], [collect.probe(f) for f in seg]
+assert all(collect.probe(f)["audio"] for f in seg) and abs(rec["dur"] - (13.0 + montage.END_S)) < .3, rec  # + écran de fin
+assert (store.DATA / rec["dir"] / "segments" / "99_ecran_de_fin.mp4").exists()  # écran de fin de 20 s
 
 # transitions : les 6, jamais la même deux fois de suite
 for n in list(range(15)) * 20 + [100]:
@@ -234,9 +238,9 @@ d4 = {"project": {"name": "T", "items": ["c0", "c1", "c2", "c3"], "transitions":
       "clips": {f"c{k}": {"id": f"c{k}", "source_id": f"s{k}", "category": cat, "src_start": 0, "in": 0, "out": 20}
                 for k, cat in enumerate(("FUN", "WTF", "FAIL", "EPIC"))}}
 desc = montage.description(d4)  # chapitres au nom du streamer ; crédits : une ligne par streamer, sans liens horodatés
-assert "0:00 Intro\n0:20 Lacy\n0:39 Jynxzi\n0:59 Final\n" in desc and "dans la vidéo" not in desc, desc
+assert "0:00 Intro\n0:20 Lacy\n0:40 Jynxzi\n1:01 Final\n" in desc and "dans la vidéo" not in desc, desc
 assert desc.count("▶ Kai — https://www.twitch.tv/kai") == 1 and "▶ Lacy — https://www.twitch.tv/lacy" in desc, desc
-assert abs(store.bestof_total(list(d4["clips"].values())) - 78.8) < 1e-9 and store.bestof_total(list(d4["clips"].values()), False) == 80
+assert abs(store.bestof_total(list(d4["clips"].values())) - 81.2) < 1e-9 and store.bestof_total(list(d4["clips"].values()), False) == 80
 d4["project"]["transitions"] = False
 assert "0:00 Intro\n0:20 Lacy\n0:40 Jynxzi\n1:00 Final\n" in montage.description(d4)
 
@@ -266,7 +270,7 @@ assert store.load()["project"]["music"] == [m1["id"], m2["id"]]  # envoyée = d�
 pj = app.patch_project({"music": [m1["id"], "zz", m2["id"], m1["id"]], "music_vol": 30, "transitions": True})
 assert (pj["music"], pj["music_vol"], pj["transitions"]) == ([m1["id"], m2["id"]], 30, True), pj
 
-# export avec transitions + 2 musiques (répétées : 19 s de musique pour 20,2 s de vidéo) : 3 × 7 s - 2 transitions
+# export avec transitions + 2 musiques (répétées : 19 s de musique pour 21,8 s de vidéo) : 3 × 7 s + 2 transitions
 with store.tx() as db:
     for k in range(3):
         db["clips"][f"t{k}"] = {"id": f"t{k}", "source_id": "sc", "status": "kept", "file": "media/clips/av.mp4", "src_start": 0,
@@ -274,9 +278,9 @@ with store.tx() as db:
     db["project"]["items"] = ["t0", "t1", "t2"]
 rec = montage.export(jobs.Job("export", "test", None, ()))
 sd = montage.stream_durs(store.DATA / rec["files"]["mp4"])
-assert abs(rec["dur"] - (21 - 2 * store.XT)) < .3 and abs(sd["audio"] - sd["video"]) < .1, (rec, sd)
+assert abs(rec["dur"] - (21 + 2 * store.XT + montage.END_S)) < .3 and abs(sd["audio"] - sd["video"]) < .1, (rec, sd)  # transitions hors sélection + fin
 assert "Music: Piste A, Piste B" in (store.DATA / rec["files"]["description"]).read_text("utf-8")
-assert not (store.DATA / rec["dir"] / "liste.txt").exists() and not (store.DATA / rec["dir"] / "musique.wav").exists()
+assert not (store.DATA / rec["dir"] / "musique.wav").exists()
 assert app.del_music(m2["id"]) and store.load()["project"]["music"] == [m1["id"]] and not (store.DATA / m2["file"]).exists()
 assert [m["id"] for m in store.load()["music"].values()] == [m1["id"]]
 

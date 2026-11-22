@@ -3,3 +3,6 @@ data/
 .venv/
 __pycache__/
 *.pyc
+
+# miniatures YouTube de travail : pas dans le dépôt public
+images/thumbnails/

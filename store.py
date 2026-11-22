@@ -100,22 +100,25 @@ XF = 0.25  # fondu image + son entre deux morceaux d'un extrait coupé (les deux
 
 
 def joins(p):
-    """Durée de chaque fondu entre morceaux : 0,25 s, moins si un morceau est très court (au plus la moitié de chacun)."""
-    return [min(XF, (p[k][1] - p[k][0]) / 2, (p[k + 1][1] - p[k + 1][0]) / 2) for k in range(len(p) - 1)]
+    """Fondu entre deux morceaux d'un extrait coupé : 0,25 s pris dans la partie coupée (moins si elle est plus courte),
+    pour que les morceaux gardés soient joués en entier."""
+    return [min(XF, (p[k + 1][0] - p[k][1]) / 2) for k in range(len(p) - 1)]  # moitié du trou de chaque côté : rien n'est montré deux fois
 
 
 def cdur(c):
-    """Durée utile d'un extrait : ses morceaux (après réglage et coupes), moins les fondus qui les relient."""
+    """Durée d'un extrait dans la vidéo : ses morceaux (après réglage et coupes), plus les fondus qui les relient (pris hors
+    sélection)."""
     p = segs(c)
-    return sum(max(0.0, float(b) - float(a)) for a, b in p) - sum(joins(p))
+    return sum(max(0.0, float(b) - float(a)) for a, b in p) + sum(joins(p))
 
 
 XT = 0.4  # transition entre deux extraits du best-of (ils se chevauchent d'autant)
 
 
 def bestof_total(clips, transitions=True):
-    """Durée finale du best-of : les extraits, moins une transition de 0,4 s entre deux extraits."""
-    return sum(cdur(c) for c in clips) - (XT * (len(clips) - 1) if transitions and clips else 0)
+    """Durée finale du best-of : les extraits, plus 0,4 s par transition (prise juste avant et juste après chaque sélection,
+    qui reste jouée en entier)."""
+    return sum(cdur(c) for c in clips) + (XT * (len(clips) - 1) if transitions and clips else 0)
 
 
 def day(t):

@@ -128,7 +128,6 @@ NVIDIA (Mac), Whisper tourne sur le processeur avec un modèle plus petit : plus
 | `X` / `↓` / `Z` | poubelle / plus tard / annuler |
 | `I` / `O` | début / fin à la position actuelle (ou boutons ±1 s, ou bords de la barre) |
 | `K` / `Suppr` | couper le morceau ici / supprimer le morceau choisi |
-| `R`, `C`, `V` | signaler radio / cinématique / violence |
 | `Espace`, `←` `→`, `M`, `+` `−` | pause, ±3 s, muet, volume |
 
 ## Fichiers

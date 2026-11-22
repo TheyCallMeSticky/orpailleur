@@ -20,7 +20,8 @@ import store
 
 sys.path.insert(0, str(store.ROOT / "vendor" / "gta6clipper"))
 
-PAD = 8              # secondes téléchargées en plus de chaque côté (pour pouvoir élargir l'extrait au réglage)
+PAD = 8              # secondes téléchargées en plus après l'extrait (pour pouvoir l'élargir au réglage)
+PAD_BEFORE = 30      # et avant : la réaction du streamer et du chat arrive après l'action, la mise en place est souvent avant
 MIN_LEN, MAX_LEN = 12, 60
 CLIP_MAX = 150       # une vidéo plus courte est importée telle quelle (c'est déjà un clip)
 WHOLE_MAX = 1800     # « Mettre directement dans le Tri » : 30 min au plus (sinon un passage, ou la recherche des meilleurs moments)
@@ -231,6 +232,14 @@ def covering(segs, s0, s1):
     return [s for s in segs if s[0] + s[1] > s0 and s[0] < s1]
 
 
+# le serveur vidéo de Kick (stream.kick.com) refuse le client Python par défaut (403) : on se présente comme un navigateur
+UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36"}
+
+
+def http_get(url, timeout=60):
+    return urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=timeout).read()
+
+
 def hls_segments(url):
     """Morceaux (≈10 s) de la VOD Twitch/Kick en 1080p max, avec leur position exacte. Gardé 30 min (10 extraits = 1 seule lecture)."""
     import time as _t
@@ -241,7 +250,7 @@ def hls_segments(url):
     if r.returncode or not r.stdout.strip():
         raise RuntimeError("playlist introuvable : " + r.stderr.strip()[-200:])
     m3u8 = r.stdout.strip().splitlines()[0]
-    text = urllib.request.urlopen(m3u8, timeout=60).read().decode()
+    text = http_get(m3u8).decode()
     segs = parse_m3u8(text, m3u8)
     if not segs:
         raise RuntimeError("playlist vide")
@@ -263,7 +272,7 @@ def hls_section(url, cid, s0, s1):
     def get(seg):
         for k in range(3):
             try:
-                return urllib.request.urlopen(seg[2], timeout=60).read()
+                return http_get(seg[2])
             except Exception:  # noqa: BLE001
                 if k == 2:
                     raise
@@ -715,7 +724,7 @@ def finish(job, url, res, max_n, streamer="", local=None, machine=""):
     errs = []
 
     def fetch_one(i, g):
-        s0, s1 = max(0.0, g["t0"] - PAD), g["t1"] + PAD
+        s0, s1 = max(0.0, g["t0"] - PAD_BEFORE), g["t1"] + PAD
         if dur:
             s1 = min(dur, s1)
         cid = store.uid()
