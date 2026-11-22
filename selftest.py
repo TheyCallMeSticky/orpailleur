@@ -75,12 +75,13 @@ assert collect.m3u8_init('#EXTM3U\n#EXT-X-MAP:URI="init-0.mp4"\n#EXTINF:10,\n0.m
 import store  # noqa: E402
 (store.CLIPS / "t1.mp4").write_bytes(b"x" * 100)
 db = {"sources": {"s1": {}}, "clips": {"t1": {"id": "t1", "source_id": "s1", "status": "trash", "src_start": 100, "in": 8, "out": 30,
-                                              "file": "media/clips/t1.mp4", "thumb": ""},
+                                              "file": "media/clips/t1.mp4", "thumb": "", "bytes": 100},
                                        "k1": {"id": "k1", "source_id": "s1", "status": "kept", "file": "media/clips/k1.mp4"}}}
 db["sources"]["s1"]["streamer"] = "Kai"
 db["clips"]["t1"]["ai"] = {"category": "FAIL", "rating": 4, "reason": "r"}
-assert montage.purge_trash(db, {"t1", "k1"}) == (1, 100) and list(db["clips"]) == ["k1"] and db["sources"]["s1"]["trashed"] == [[108, 130]]
-assert not (store.CLIPS / "t1.mp4").exists()
+assert montage.purge_trash(db, {"t1", "k1"}) == (1, 100, ["media/clips/t1.mp4"]) and list(db["clips"]) == ["k1"]
+assert db["sources"]["s1"]["trashed"] == [[108, 130]] and (store.CLIPS / "t1.mp4").exists()  # fichiers : hors du verrou de la base
+assert montage.delete_files(["media/clips/t1.mp4", "media/clips/absent.mp4"]) == 2 and not (store.CLIPS / "t1.mp4").exists()
 arch = [json.loads(x) for x in montage.ARCHIVE.read_text("utf-8").splitlines()]  # la fiche est gardée, sans la vidéo
 assert arch[-1]["id"] == "t1" and arch[-1]["ai"]["category"] == "FAIL" and arch[-1]["streamer"] == "Kai" and arch[-1]["purged"], arch
 
@@ -99,34 +100,92 @@ assert vods.title_gta("GTA 6 LIVE | Day 2") and not vods.title_gta("chain togeth
 assert collect.ts_link("https://www.twitch.tv/videos/1", 3725) == "https://www.twitch.tv/videos/1?t=1h2m5s"
 assert collect.ts_link("https://www.youtube.com/watch?v=x", 61) == "https://www.youtube.com/watch?v=x&t=61"
 
-# moteur -> hub : detect rend un RESULT qui passe en JSON, finish (téléchargement simulé) crée les extraits et la fiche d'analyse
+# stockage : signature S3 (exemple de la documentation AWS), mode local (liens signés par le site, expirés refusés)
+import datetime  # noqa: E402
+import s3  # noqa: E402
+aws = {"endpoint": "https://s3.amazonaws.com", "region": "us-east-1", "bucket": "examplebucket", "key": "AKIAIOSFODNN7EXAMPLE",
+       "secret": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"}
+assert s3.presign("GET", "test.txt", 86400, aws, datetime.datetime(2013, 5, 24, tzinfo=datetime.timezone.utc)).endswith(
+    "X-Amz-Signature=aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404")
+assert s3.conf() is None and s3.ok_key("media/clips/a.mp4") and not s3.ok_key("data/db.json") and not s3.ok_key("media/../db.json")
+lk_url = s3.url("PUT", "inbox/x.mp4", 60)
+q_ = dict(p.split("=") for p in lk_url.split("?")[1].split("&"))
+assert lk_url.startswith("/files/inbox/x.mp4?") and s3.local_ok("PUT", "inbox/x.mp4", q_["e"], q_["t"])
+assert not s3.local_ok("GET", "inbox/x.mp4", q_["e"], q_["t"]) and not s3.local_ok("PUT", "inbox/y.mp4", q_["e"], q_["t"])
+assert not s3.local_ok("PUT", "inbox/x.mp4", "1", s3.local_token("PUT", "inbox/x.mp4", "1"))  # expiré
+assert s3.ctype("exports/a/description_youtube.txt") == "text/plain; charset=utf-8" and s3.ctype("media/clips/a.mp4") == "video/mp4"
+
+
+def lget(k, dst):  # moteur simulé : le stockage local est le dossier de données du test
+    Path(dst).parent.mkdir(parents=True, exist_ok=True)
+    if Path(dst).resolve() != (store.DATA / k).resolve():
+        shutil.copy(store.DATA / k, dst)
+
+
+def lput(src, k):
+    (store.DATA / k).parent.mkdir(parents=True, exist_ok=True)
+    if Path(src).resolve() != (store.DATA / k).resolve():
+        shutil.copy(src, store.DATA / k)
+
+
+# moteur -> site : detect rend un RESULT, finish (Claude, sur le site) donne la tâche « clips », le moteur télécharge, mesure,
+# fait la vignette et envoie ; le site enregistre les fiches et la fiche d'analyse
 import shutil  # noqa: E402
 import subprocess  # noqa: E402
 vid = store.TMP / "test.mp4"
 subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=30", "-t", "60", str(vid)], check=True)  # 30 s de marge avant chaque extrait
 collect.chat_signals = lambda job, url, m, lo, hi: [sig(100, 120, "chat", 1.0, "chat x2")]
 collect.audio_signals = lambda job, key, lo, hi, *a: [sig(500, 510, "audio", .7, "audio rires 0.7")]
-collect.download = lambda url, cid, s0=None, s1=None: shutil.copy(vid, store.CLIPS / f"{cid}.mp4")
+_dl0 = collect.download  # le vrai (pour le test d'erreur d'un moteur, sans réseau)
+collect.download = lambda url, cid, s0=None, s1=None: Path(shutil.copy(vid, store.CLIPS / f"{cid}.mp4"))
 url, jd = "https://www.youtube.com/watch?v=test", jobs.Job("collect", "test", None, ())
 res = json.loads(json.dumps(collect.detect(jd, url, {"title": "T", "duration": 3600, "width": 1920, "height": 1080}, 2, "",
                                            [(95, 125)], ai_on=False)))
 assert [g["t0"] for g in res["auto"]] == [499.0] and res["cands"] is None and res["meta"]["duration"] == 3600, res
-assert collect.finish(jd, url, dict(res, steps=[["Whisper", 9]], total=60), 2, "Kai", machine="PC-test") == 1
+plan = collect.finish(jd, url, dict(res, steps=[["Whisper", 9]], total=60), 2, "Kai", machine="PC-test")
+p0 = plan["picks"][0]
+assert len(plan["picks"]) == 1 and (p0["s0"], p0["s1"]) == (499 - collect.PAD, 511 + collect.PAD) and plan["input"] == url, plan
+out = json.loads(json.dumps(collect.fetch_clips(jd, plan, lget, lput)))  # ce qui part au site
+m0 = out["clips"][0]
+assert m0["file"] == f"media/clips/{p0['cid']}.mp4" and m0["thumb"] == f"media/thumbs/{p0['cid']}.jpg" and m0["bytes"] > 0, m0
+assert collect.add_clips(jd, plan, out["clips"], "PC-dl", [["Téléchargement des extraits en 1080p", 3]], 5) == 1
 src = next(s for s in store.load()["sources"].values() if s["url"] == url)
-assert src["streamer"] == "Kai" and src["analyses"][0]["machine"] == "PC-test" and src["analyses"][0]["total"] == 60
-assert src["analyses"][0]["steps"][0] == ["Whisper", 9] and collect.taken_for(store.load(), url) and collect.taken_for(store.load(), "x") == []
-# finalisation reprise après un arrêt du hub (même résultat une 2e fois) : rien n'est retéléchargé, pas de doublon dans le Tri
+an = src["analyses"][0]
+assert src["streamer"] == "Kai" and an["machine"] == "PC-test" and an["total"] >= 65 and an["clips"] == 1, an
+assert an["steps"][0] == ["Whisper", 9] and an["steps"][-1][0].startswith("Téléchargement"), an
+c = store.load()["clips"][p0["cid"]]
+assert (c["src_start"], c["in"], c["out"]) == (491, 8, 20) and (store.DATA / c["thumb"]).exists(), c
+assert collect.taken_for(store.load(), url) and collect.taken_for(store.load(), "x") == []
+# rejouée après un arrêt du site : pas de doublon ; même résultat d'analyse une 2e fois : rien de nouveau à télécharger
 n_clips = len(store.load()["clips"])
-assert collect.finish(jd, url, res, 2, "Kai") == 0 and len(store.load()["clips"]) == n_clips
-# « Récupérer 30 s avant » : 30 s de plus au début, même fin, réglages décalés pour rester sur les mêmes images
+assert collect.add_clips(jd, plan, out["clips"]) == 1 and len(store.load()["clips"]) == n_clips
+assert collect.finish(jd, url, res, 2, "Kai") is None
+# un moteur ne peut pas faire enregistrer n'importe quel fichier
+for bad in ({**m0, "file": "media/../db.json"}, {**m0, "thumb": "media/thumbs/autre.jpg"}, {**m0, "dur": float("nan")}):
+    try:
+        collect.add_clip("x", bad, 0, 5, "w", 1)
+        raise AssertionError(f"fiche acceptée : {bad}")
+    except ValueError:
+        pass
+# « Récupérer 30 s avant » (fichier envoyé, sur le stockage) : 30 s de plus au début, même fin, réglages décalés
 f0 = collect.cut_local(str(vid), "ext0", 40, 55)
+shutil.copy(vid, store.INBOX / "src.mp4")
 with store.tx() as db:
-    db["sources"]["loc"] = {"id": "loc", "url": str(vid), "platform": "local", "streamer": "L"}
+    db["sources"]["loc"] = {"id": "loc", "url": "inbox/src.mp4", "platform": "local", "streamer": "L"}
     db["clips"]["ext0"] = {"id": "ext0", "source_id": "loc", "status": "new", "file": f"media/clips/{f0.name}", "src_start": 40,
                            "in": 2, "out": 10, "segs": [[2, 5], [7, 10]], "file_dur": 15.0}
-ce, delta = collect.extend_before("ext0")
+xd = collect.extend_request("ext0")
+assert xd["local"] and xd["input"] == "inbox/src.mp4" and (xd["s0"], xd["s1"]) == (10, 55) and xd["name"].startswith("ext0-"), xd
+r = collect.extended(xd, json.loads(json.dumps(collect.extend_clip(jd, xd, lget, lput))))
+ce, delta = r["clip"], r["delta"]
 assert delta == 30 and ce["src_start"] == 10 and (ce["in"], ce["out"]) == (32, 40) and ce["segs"] == [[32, 35], [37, 40]], ce
 assert abs(ce["file_dur"] - 45) < .5 and not f0.exists() and (store.DATA / ce["file"]).exists(), ce
+assert collect.extended(xd, {"file": ce["file"], "s0": 10, "dur": 45})["delta"] == 0  # rejouée : rien ne bouge
+try:
+    collect.extended(xd, {"file": "media/clips/autre.mp4", "s0": 10, "dur": 45})
+    raise AssertionError("fichier inattendu accepté")
+except ValueError:
+    pass
 try:
     collect.detect(jd, url, {"duration": 60, "width": 1080, "height": 1920}, 2, "", [])
     raise AssertionError("vidéo verticale acceptée")
@@ -156,6 +215,59 @@ g = E.beat("m", B(want=1, jobs=[{"lease": L, "url": U}]))
 assert g["kill"] == [L] and g["paused"] and not g["give"] and U in store.load()["pending"]
 assert E.result("m", {"lease": L, "url": U, "ok": False}) == {"ok": False, "error": "perdu"}
 
+# tâches des moteurs : « 30 s avant » d'abord, machine visée (sauf si elle ne répond plus), place libre seulement pour une
+# analyse, liens signés limités aux fichiers de la tâche, reprise après un redémarrage du site
+import time  # noqa: E402
+E.control("m", "resume")
+with store.tx() as db:
+    db["pending"] = []
+E.add_task("add", "a", {"input": "https://x/a", "key": None, "cid": "cidadd0001"})
+E.add_task("extend", "e", {"cid": "ext0", "input": "inbox/src.mp4", "local": True, "name": "ext0-zz", "s0": 1, "s1": 2}, machine="n")
+tid_a, tid_e = (next(k for k, v in store.load()["tasks"].items() if v["kind"] == kd) for kd in ("add", "extend"))
+E.MACHINES["n"] = {"last_seen": time.time()}
+assert E.beat("p", B(want=0))["give"] == []                    # l'ajout attend une place, « 30 s avant » attend « n »
+g = E.beat("n", B(want=0))
+assert [x["kind"] for x in g["give"]] == ["extend"] and g["give"][0]["data"]["name"] == "ext0-zz", g
+L2 = g["give"][0]["lease"]
+assert [x["kind"] for x in E.beat("p", B(want=1))["give"]] == ["add"]
+assert E.sign("n", {"lease": L2, "get": ["inbox/src.mp4"], "put": ["media/clips/ext0-zz.mp4"]})["ok"]
+assert not E.sign("n", {"lease": L2, "get": ["media/clips/autre.mp4"]})["ok"]
+assert not E.sign("n", {"lease": L2, "put": ["media/clips/ext0-zzz.mp4"]})["ok"]
+assert not E.sign("p", {"lease": L2, "get": ["inbox/src.mp4"]})["ok"]   # pas son bail
+E.LEASES.clear()                                                      # site relancé : baux oubliés, repris au battement
+g = E.beat("n", B(jobs=[{"lease": L2, "task": tid_e, "url": "task:" + tid_e}]))
+assert not g["kill"] and E.LEASES[L2]["task"] == tid_e and E.TRACK[tid_e].status == "en cours"
+E.LEASES[L2]["until"] = 0                                             # moteur éteint : la tâche attend un autre PC
+E.beat("p", B())
+assert L2 not in E.LEASES and E.TRACK[tid_e].status == "en attente" and tid_e in store.load()["tasks"]
+E.MACHINES["n"]["last_seen"] = 0                                      # « n » ne répond plus : un autre PC la prend
+assert [x["kind"] for x in E.beat("p", B())["give"]] == ["extend"]
+for t in (tid_a, tid_e):
+    E.cancel(t, "test")
+E.LEASES.clear()
+assert not store.load()["tasks"]
+
+# export : le PC de la personne qui clique (même adresse), sinon le premier en ligne (ordre de l'onglet Machines), jamais
+# une machine en pause ou éteinte ; aucune -> None (« Aucun PC allumé »)
+E.CONF["machines"] = {"t": {"name": "m"}, "t2": {"name": "p"}, "t3": {"name": "n"}}
+now = time.time()
+E.MACHINES.update(m={"last_seen": now, "ip": "100.1.1.1"}, p={"last_seen": now, "ip": "100.2.2.2"}, n={"last_seen": 0, "ip": "100.3.3.3"})
+assert (E.export_machine("100.2.2.2"), E.export_machine("100.9.9.9"), E.export_machine("100.3.3.3")) == ("p", "m", "m")
+E.control("m", "pause")
+assert E.export_machine("100.1.1.1") == "p"
+E.control("m", "resume")
+E.MACHINES["m"]["last_seen"] = E.MACHINES["p"]["last_seen"] = 0
+assert E.export_machine("100.2.2.2") is None
+E.MACHINES["p"]["last_seen"] = time.time()
+
+
+def wait_task(tid):  # fin d'une tâche traitée par le site dans un fil à part
+    for _ in range(300):
+        if tid not in (store.load().get("tasks") or {}):
+            return
+        time.sleep(.1)
+    raise AssertionError(f"tâche {tid} pas finie")
+
 # moteur.py : l'enfant écrit toujours <job>.out.json (erreur + journal, Skip garde son code) ; même empreinte de code que le hub
 import moteur  # noqa: E402
 assert moteur.code_version() == E.code_version() and len(moteur.code_version()) == 8
@@ -176,6 +288,14 @@ moteur.child(jf)
 collect.detect_vod = _dv
 o = json.load(open(jf[:-5] + ".out.json", encoding="utf-8"))
 assert (o["ok"], o["code"], o["error"]) == (False, "restricted", "abonnés") and "Écartée" in o["log"], o
+# tâche du site sur un moteur : erreur et journal remontent aussi (téléchargement impossible, sans réseau)
+json.dump({"lease": "L3", "task": "T3", "kind": "extend", "url": "task:T3", "title": "x", "hub": "http://127.0.0.1:1", "token": "k",
+           "data": {"input": "http://127.0.0.1:1/x", "local": False, "s0": 0, "s1": 5, "name": "zz"}}, open(jf, "w", encoding="utf-8"))
+_dl1, collect.download = collect.download, _dl0
+moteur.child(jf)
+collect.download = _dl1
+o = json.load(open(jf[:-5] + ".out.json", encoding="utf-8"))
+assert o["ok"] is False and "ERREUR" in o["log"], o
 
 # coupes : morceaux bornés au fichier, triés, fusionnés s'ils se chevauchent ou se touchent, miettes retirées ; 1 morceau = in/out
 import time  # noqa: E402
@@ -214,6 +334,12 @@ with store.tx() as db:
 row = app.vod_rows(store.load())[0]
 assert abs(row["ended"] - (time.time() - 7200)) < 5 and row["day"] == store.day(row["ended"]), row
 
+def export_now():  # site : instantané ; moteur : fabrication + envoi ; site : fiche, « utilisés », poubelle
+    d = montage.snapshot()
+    je = jobs.Job("export", "test", None, ())
+    return montage.save(je, d, json.loads(json.dumps(montage.render_task(je, d, lget, lput))))
+
+
 # export d'un extrait coupé en 2 morceaux (avec son, puis sans son) : un seul segment = morceaux + fondu de 0,25 s pris dans la coupure
 av = store.TMP / "av.mp4"
 subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=30", "-f", "lavfi", "-i",
@@ -228,7 +354,7 @@ with store.tx() as db:
     db["project"]["transitions"] = False  # ni transition ni musique : segments mis bout à bout sans réencodage
 app.patch_clip("av", {"segs": [[2, 5], [10, 14]]}, "u")
 app.patch_clip("mute", {"segs": [[1, 3], [20, 23.5]]}, "u")
-rec = montage.export(jobs.Job("export", "test", None, ()))
+rec = export_now()
 seg = sorted((store.DATA / rec["dir"] / "segments").glob("*.mp4"))
 assert [abs(collect.probe(f)["dur"] - d) < .2 for f, d in zip(seg, (7.25, 5.75))] == [True, True], [collect.probe(f) for f in seg]
 assert all(collect.probe(f)["audio"] for f in seg) and abs(rec["dur"] - (13.0 + montage.END_S)) < .3, rec  # + écran de fin
@@ -253,8 +379,7 @@ assert abs(store.bestof_total(list(d4["clips"].values())) - 81.2) < 1e-9 and sto
 d4["project"]["transitions"] = False
 assert "0:00 Intro\n0:20 Lacy\n0:40 Jynxzi\n1:00 Final\n" in montage.description(d4)
 
-# musiques de fond : format, son et durée vérifiés à l'envoi (un fichier refusé est supprimé)
-import io  # noqa: E402
+# musiques de fond : format, poids et durée (lue par le navigateur) vérifiés avant l'envoi direct au stockage
 
 
 def tone(sec, f):
@@ -264,15 +389,29 @@ def tone(sec, f):
     return w.read_bytes()
 
 
-for name, data in (("note.txt", b"x"), ("faux.mp3", b"pas du son" * 100), ("court.wav", tone(3, 300))):
+for name, size, dur in (("note.txt", 10, 30), ("lourd.mp3", 70 << 20, 30), ("court.wav", 1000, 3), ("faux.mp3", 1000, None)):
     try:
-        app.add_music(name, len(data), io.BytesIO(data))
+        app.music_start(name, size, dur)
         raise AssertionError(f"musique acceptée : {name}")
     except ValueError:
         pass
-assert not any(store.MUSIC.iterdir())
+
+
+def add_music(name, data, by=""):  # navigateur : durée lue, envoi direct (ici : écrit sur le stockage local), confirmation
+    st = app.music_start(name, len(data), 11.0)
+    assert st["put"].startswith("/files/media/music/"), st
+    (store.DATA / st["key"]).write_bytes(data)
+    return app.music_done({"id": st["id"], "key": st["key"], "name": st["name"], "dur": st["dur"]}, by)
+
+
+for bad in ({"id": "x", "key": "media/music/x.mp3", "dur": 20}, {"id": "abcdefghij", "key": "media/clips/abcdefghij.mp3", "dur": 20}):
+    try:
+        app.music_done(bad)
+        raise AssertionError(f"musique acceptée : {bad}")
+    except ValueError:
+        pass
 b1, b2 = tone(11, 440), tone(11, 660)
-m1, m2 = app.add_music("C:\\Musique\\Piste A.wav", len(b1), io.BytesIO(b1), "u"), app.add_music("Piste B.WAV", len(b2), io.BytesIO(b2))
+m1, m2 = add_music("C:\\Musique\\Piste A.wav", b1, "u"), add_music("Piste B.WAV", b2)
 assert (m1["name"], m2["name"]) == ("Piste A", "Piste B") and abs(m1["dur"] - 11) < .2 and (store.DATA / m1["file"]).is_file(), m1
 assert [m["id"] for m in app.state()["music"]] == [m1["id"], m2["id"]]
 assert store.load()["project"]["music"] == [m1["id"], m2["id"]]  # envoyée = déjà dans le best-of en cours
@@ -285,7 +424,7 @@ with store.tx() as db:
         db["clips"][f"t{k}"] = {"id": f"t{k}", "source_id": "sc", "status": "kept", "file": "media/clips/av.mp4", "src_start": 0,
                                 "in": k * 8, "out": k * 8 + 7, "file_dur": 30.0, "fps": 30, "rating": 4, "category": "FUN", "flags": {}}
     db["project"]["items"] = ["t0", "t1", "t2"]
-rec = montage.export(jobs.Job("export", "test", None, ()))
+rec = export_now()
 sd = montage.stream_durs(store.DATA / rec["files"]["mp4"])
 assert abs(rec["dur"] - (21 + 2 * store.XT + montage.END_S)) < .3 and abs(sd["audio"] - sd["video"]) < .1, (rec, sd)  # transitions hors sélection + fin
 assert "Music: Piste A, Piste B" in (store.DATA / rec["files"]["description"]).read_text("utf-8")
@@ -295,18 +434,21 @@ assert [m["id"] for m in store.load()["music"].values()] == [m1["id"]]
 
 # aucune musique choisie : tirée au hasard dans la bibliothèque à l'export et gardée dans le best-of ; case décochée : aucune
 app.patch_project({"music": []})
-rec = montage.export(jobs.Job("export", "test", None, ()))
+rec = export_now()
 assert store.load()["project"]["music"] == [m1["id"]] and "Music: Piste A" in (store.DATA / rec["files"]["description"]).read_text("utf-8")
 app.patch_project({"music_on": False})
 assert montage.music_of(store.load()) == [] and store.load()["project"]["music_on"] is False
 app.patch_project({"music_on": True})
 
-# ajout à la main « tel quel dans le Tri » (fichier local) : un passage = un extrait en tête du Tri ; > 30 min refusé
-long = store.TMP / "long.mp4"
+# ajout à la main « tel quel dans le Tri » (fichier envoyé sur le stockage, traité par un moteur) : un passage = un extrait en
+# tête du Tri ; > 30 min refusé ; passage déjà pris refusé sur le site (et le fichier envoyé par le moteur supprimé)
+long = store.INBOX / "kk_long.mp4"
 subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "color=c=red:size=64x36:rate=1", "-t", "1900", str(long)], check=True)
 jw = jobs.Job("collect", "test", None, ())
+dw = {"key": "inbox/kk_long.mp4", "name": "long.mp4", "mode": "whole", "window": "", "streamer": "Peanut", "by": "Azer",
+      "cid": store.uid(), "taken": []}
 try:
-    collect.collect(jw, str(long), mode="whole", by="Azer")
+    collect.add_video(jw, dw, lget, lput)
     raise AssertionError("vidéo de 31 min acceptée en entier")
 except RuntimeError as e:
     assert "Trop long" in str(e)
@@ -315,17 +457,51 @@ try:
     raise AssertionError("passage à l'envers accepté")
 except ValueError:
     pass
-assert collect.collect(jw, str(long), 10, "1:00-1:20", "Peanut", mode="whole", by="Azer") == 1
-c = max(store.load()["clips"].values(), key=lambda c: c.get("added") or "")
+d2 = dict(dw, window="1:00-1:20", cid=store.uid())
+assert collect.added(jw, d2, json.loads(json.dumps(collect.add_video(jw, d2, lget, lput)))) is None
+c = store.load()["clips"][d2["cid"]]
 src = store.load()["sources"][c["source_id"]]
-assert (c["score"], c["why"], c["src_start"], src["added_by"], src["streamer"]) == (50, "ajouté par Azer", 60, "Azer", "Peanut"), c
+assert (c["score"], c["why"], c["src_start"], src["added_by"], src["streamer"], src["url"]) == \
+    (50, "ajouté par Azer", 60, "Azer", "Peanut", "inbox/kk_long.mp4"), (c, src)
 assert abs(store.cdur(c) - 20) < 1.5, c
 assert app.next_clips("v", set())["clips"][0]["id"] == c["id"]  # en tête du Tri
+d3 = dict(dw, window="1:10-1:30", cid=store.uid())
+o3 = collect.add_video(jw, d3, lget, lput)
 try:
-    collect.collect(jw, str(long), 10, "1:10-1:30", "Peanut", mode="whole", by="Azer")
+    collect.added(jw, d3, o3)
     raise AssertionError("passage déjà ajouté accepté")
 except RuntimeError as e:
-    assert "Déjà ajoutée" in str(e)
+    assert "Déjà ajoutée" in str(e) and not (store.DATA / o3["clip"]["file"]).exists()
+
+# tâche « add » de bout en bout par le site : file, moteur, résultat, fiche dans le Tri (traitée dans un fil à part)
+shutil.copy(av, store.INBOX / "kk_av.mp4")
+ja = E.add_task("add", "av.mp4", {"key": "inbox/kk_av.mp4", "name": "av.mp4", "mode": None, "window": "", "streamer": "Zed",
+                                  "by": "Bob", "cid": "addviadone", "taken": []})
+tid = next(iter(store.load()["tasks"]))
+g = E.beat("p", B(want=1))["give"][0]
+assert g["task"] == tid and ja.status == "en cours"
+assert E.sign("p", {"lease": g["lease"], "get": ["inbox/kk_av.mp4"], "put": ["media/clips/addviadone.mp4", "media/thumbs/addviadone.jpg"]})["ok"]
+o = json.loads(json.dumps(collect.add_video(jobs.Job("add", "t", None, ()), g["data"], lget, lput)))
+assert E.done("p", {"lease": g["lease"], "task": tid, "ok": True, "out": o, "steps": [["Envoi", 1]], "log": "journal du moteur"})["ok"]
+assert E.done("p", {"lease": g["lease"], "task": tid, "ok": True, "out": o})["ok"] is False  # déjà reçue
+wait_task(tid)
+assert "addviadone" in store.load()["clips"] and ja.status == "terminé" and any("journal du moteur" in x for x in ja.lines), ja.lines
+
+# export de bout en bout par le site, sur le PC « p » : poubelle vidée à la fin, fichiers supprimés du stockage
+with store.tx() as db:
+    db["clips"]["addviadone"]["status"] = "trash"
+    db["project"]["items"] = ["t0"]
+jx = E.add_task("export", "x", montage.snapshot(), "p")
+tid = next(iter(store.load()["tasks"]))
+g = E.beat("p", B(want=0))["give"][0]   # hors place : passe même sans place libre
+assert g["kind"] == "export" and E.sign("p", {"lease": g["lease"], "put": [g["data"]["dir"] + "/segments/01.mp4"]})["ok"]
+assert not E.sign("p", {"lease": g["lease"], "put": ["exports/autre/x.mp4"]})["ok"]
+o = json.loads(json.dumps(montage.render_task(jobs.Job("export", "t", None, ()), g["data"], lget, lput)))
+assert E.done("p", {"lease": g["lease"], "task": tid, "ok": True, "out": o})["ok"]
+wait_task(tid)
+assert jx.status == "terminé" and store.load()["exports"][0]["dir"] == g["data"]["dir"], jx.lines
+assert "addviadone" not in store.load()["clips"] and not (store.CLIPS / "addviadone.mp4").exists()
+assert (store.DATA / store.load()["exports"][0]["files"]["mp4"]).exists()
 assert collect.streamer_of({"channel": "xQc"}, "https://clips.twitch.tv/AwkwardHelplessSalamander")[1] == "https://www.twitch.tv/xqc"
 
 shutil.rmtree(store.DATA, ignore_errors=True)

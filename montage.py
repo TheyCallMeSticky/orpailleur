@@ -266,11 +266,16 @@ def end_card(dst, fps):
     tf = dst.with_suffix(".txt")
     tf.write_text("THANKS FOR WATCHING!  SUBSCRIBE FOR MORE", "utf-8")
     vf = (f"zoompan=z='1+0.06*on/{END_S * fps}':x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2':d=1:s=1920x1080:fps={fps},"
-          f"drawtext=fontfile='{FONT}':textfile='{tf}':x=(w-text_w)/2:y=70:fontsize=64:fontcolor=white:"
+          f"drawtext=fontfile='{_fp(FONT)}':textfile='{_fp(tf)}':x=(w-text_w)/2:y=70:fontsize=64:fontcolor=white:"
           f"shadowcolor=black@0.7:shadowx=4:shadowy=4,format=yuv420p")
     run(["ffmpeg", "-v", "error", "-y", "-loop", "1", "-framerate", str(fps), "-i", END_IMG, "-f", "lavfi", "-i",
          "anullsrc=r=48000:cl=stereo", "-vf", vf, "-t", str(END_S), "-map", "0:v", "-map", "1:a", "-c:v", "libx264", "-preset", "fast",
          "-crf", "18", "-g", str(fps * 2), "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", dst])
+
+
+def _fp(p):
+    """Chemin dans un filtre ffmpeg : « C:\\…\\x.ttf » (Windows) casse la commande sans « C\\:/…/x.ttf »."""
+    return str(p).replace("\\", "/").replace(":", "\\:")
 
 
 def _pill(w, h, alpha):
@@ -285,7 +290,7 @@ def subscribe_banner(dst):
     centre au début de la vidéo."""
     tf = dst.with_suffix(".txt")
     tf.write_text("LIKE  •  SUBSCRIBE  •  COMMENT", "utf-8")
-    text = f"drawtext=fontfile='{FONT}':textfile='{tf}':fontsize=46:fontcolor=white"
+    text = f"drawtext=fontfile='{_fp(FONT)}':textfile='{_fp(tf)}':fontsize=46:fontcolor=white"
     box = subprocess.run(["ffmpeg", "-v", "info", "-f", "lavfi", "-i", "color=c=black:s=2400x120", "-vf", f"{text}:x=0:y=30,bbox",
                           "-frames:v", "1", "-f", "null", "-"], capture_output=True, text=True).stderr
     m = re.search(r"x1:(\d+) x2:(\d+)", box)  # largeur réelle du texte, mesurée sur un rendu (pas d'espace vide après « COMMENT »)
@@ -340,20 +345,39 @@ def assemble(job, mp4, files, durs, names, music, vol, fps, crf, banner=None):
     bed.unlink(missing_ok=True)
 
 
-def export(job):
-    tools_check()
+def snapshot():
+    """Site, au clic sur Exporter : copie du best-of pour le moteur qui va le fabriquer (extraits, sources, musiques, réglages,
+    dossier de sortie) et la poubelle de cet instant (vidée à la fin, pas celle d'après). Aucune musique choisie : tirage au
+    hasard dans la bibliothèque, gardé pour le site."""
     conf = store.config()
-    with store.lock:
-        db = json.loads(json.dumps(store.load()))
+    with store.tx() as live:
+        pj = live["project"]
+        clips = [live["clips"][i] for i in pj["items"] if i in live["clips"]]
+        if not clips:
+            raise ValueError("Le best-of est vide.")
+        if pj.get("music_on", True) and not music_of(live) and live.get("music"):
+            pj["music"] = random.sample(list(live["music"]), min(3, len(live["music"])))
+        lib = live.get("music") or {}
+        db = json.loads(json.dumps({"project": pj, "clips": {c["id"]: c for c in clips},
+                                    "sources": {c["source_id"]: live["sources"].get(c["source_id"], {}) for c in clips},
+                                    "music": {m: lib[m] for m in pj.get("music") or [] if m in lib}}))
+        trash = [c["id"] for c in live["clips"].values() if c["status"] == "trash"]
+    slug = re.sub(r"[^A-Za-z0-9_-]+", "_", pj["name"]).strip("_") or "bestof"
+    return {"db": db, "conf": {k: conf[k] for k in ("fps", "lower_third", "crf")}, "slug": slug, "trash": trash,
+            "dir": f"exports/{time.strftime('%Y%m%d_%H%M%S')}_{slug}"}
+
+
+def render(job, db, conf, out, slug):
+    """Moteur : fabrique le best-of dans `out` (vidéo, timeline DaVinci, description, CSV, segments) à partir de la copie `db`
+    et des fichiers déjà téléchargés sous store.DATA. N'écrit rien dans la base. -> (mp4, durée)."""
+    tools_check()
     pj = db["project"]
     clips = [db["clips"][i] for i in pj["items"] if i in db["clips"]]
     if not clips:
         raise RuntimeError("Le best-of est vide.")
     fps = int(conf["fps"]) if str(conf["fps"]) in ("30", "60") else (60 if min(c.get("fps") or 30 for c in clips) >= 50 else 30)
-    slug = re.sub(r"[^A-Za-z0-9_-]+", "_", pj["name"]).strip("_") or "bestof"
-    out = store.EXPORTS / f"{time.strftime('%Y%m%d_%H%M%S')}_{slug}"
     segdir = out / "segments"
-    segdir.mkdir(parents=True)
+    segdir.mkdir(parents=True, exist_ok=True)
     job.log(f"Export de {len(clips)} extraits en 1920×1080 {fps} i/s, son normalisé à -14 LUFS")
     segs, durs = [], []
     tr_on = pj.get("transitions", True) and len(clips) > 1
@@ -372,7 +396,7 @@ def export(job):
         if conf.get("lower_third") and label and FONT.exists():  # lien de la chaîne en haut à gauche, tout l'extrait
             tf = segdir / f"{i:02d}.txt"
             tf.write_text(label, "utf-8")
-            vf += (f",drawtext=fontfile='{FONT}':textfile='{tf}':x=40:y=40:fontsize=34:fontcolor=white:"
+            vf += (f",drawtext=fontfile='{_fp(FONT)}':textfile='{_fp(tf)}':x=40:y=40:fontsize=34:fontcolor=white:"
                    f"box=1:boxcolor=black@0.5:boxborderw=12")
         p = probe(src)
         has_audio, pieces, jn = p["audio"], [list(x) for x in store.segs(c)], store.joins(store.segs(c))
@@ -412,11 +436,6 @@ def export(job):
         segs.append((dst, c, s))
         durs.append(stream_durs(dst).get("video") or d)
     mp4 = out / f"{slug}.mp4"
-    if pj.get("music_on", True) and not music_of(db) and db.get("music"):  # aucune choisie : tirées au hasard, gardées pour le site
-        pj["music"] = random.sample(list(db["music"]), min(3, len(db["music"])))  # (copie locale : la description les cite)
-        with store.tx() as live:
-            live["project"]["music"] = list(pj["music"])
-        job.log("Aucune musique choisie : tirage au hasard dans la bibliothèque.")
     tr, music = tr_on, music_of(db)
     job.log("Assemblage…")
     files, all_durs = [p for p, _c, _s in segs], list(durs)
@@ -437,41 +456,85 @@ def export(job):
     (out / f"{slug}.fcpxml").write_text(fcpxml(pj["name"], [(p, round(d * fps), c, s) for (p, c, s), d in zip(segs, durs)], fps), "utf-8")
     (out / "description_youtube.txt").write_text(description(db, durs), "utf-8")
     (out / "sources.csv").write_text(sources_csv(db, durs), "utf-8")
+    for f in segdir.glob("*.txt"):  # textes des incrustations : inutiles une fois la vidéo faite
+        f.unlink()
     total = probe(mp4)["dur"]
-    rel = out.relative_to(store.DATA).as_posix()
-    rec = {"id": store.uid(), "project": pj["name"], "created": store.now(), "dur": round(total, 1), "dir": rel,
-           "files": {"mp4": f"{rel}/{mp4.name}", "fcpxml": f"{rel}/{slug}.fcpxml",
+    job.log(f"Vidéo prête : {fmt(total)}")
+    return mp4, total
+
+
+def render_task(job, d, get, put):
+    """Moteur, tâche « export » : télécharge extraits et musiques, fabrique le best-of, envoie tout le dossier au stockage."""
+    from concurrent.futures import ThreadPoolExecutor
+    db = d["db"]
+    keys = sorted({c["file"] for c in db["clips"].values()} | {m["file"] for m in music_of(db)})
+    with job.step("Téléchargement des extraits"), ThreadPoolExecutor(6) as ex:
+        list(ex.map(lambda k: get(k, store.DATA / k), keys))
+    out = store.DATA / d["dir"]
+    mp4, total = render(job, db, d["conf"], out, d["slug"])
+    files = [p for p in sorted(out.rglob("*")) if p.is_file()]
+    with job.step("Envoi de la vidéo au site"), ThreadPoolExecutor(4) as ex:
+        list(ex.map(lambda p: put(p, f"{d['dir']}/{p.relative_to(out).as_posix()}"), files))
+    return {"dur": round(total, 1)}
+
+
+def save(job, d, out):
+    """Site, fin d'une tâche « export » : fiche de l'export, extraits marqués « utilisés », poubelle de l'instant du clic vidée
+    (fiches archivées, fichiers supprimés du stockage). Rejouable : un export déjà enregistré n'est pas refait."""
+    rel, slug = d["dir"], d["slug"]
+    total = float(out.get("dur") or 0)
+    if not 0 < total < 36000:
+        raise ValueError("durée de la vidéo illisible")
+    rec = {"id": store.uid(), "project": d["db"]["project"]["name"], "created": store.now(), "dur": round(total, 1), "dir": rel,
+           "files": {"mp4": f"{rel}/{slug}.mp4", "fcpxml": f"{rel}/{slug}.fcpxml",
                      "description": f"{rel}/description_youtube.txt", "csv": f"{rel}/sources.csv"}}
     with store.tx() as live:
+        if any(e.get("dir") == rel for e in live["exports"]):
+            return rec
         live["exports"].insert(0, rec)
-        for c in clips:
-            if c["id"] in live["clips"]:
-                live["clips"][c["id"]]["used_in"] = pj["name"]
-        n, size = purge_trash(live, {c["id"] for c in db["clips"].values() if c["status"] == "trash"})  # pas celle d'après
-    job.log(f"Vidéo prête : {fmt(total)} — {mp4}")
+        for cid in d["db"]["project"]["items"]:
+            if cid in live["clips"]:
+                live["clips"][cid]["used_in"] = d["db"]["project"]["name"]
+        n, size, keys = purge_trash(live, set(d["trash"]))
+    gone = delete_files(keys)
+    job.log(f"Vidéo prête : {fmt(total)} — {rel}/{slug}.mp4")
     if n:
-        job.log(f"Poubelle vidée : {n} extrait(s) supprimé(s) définitivement ({size / 1e9:.1f} Go libérés)")
+        job.log(f"Poubelle vidée : {n} extrait(s) supprimé(s) définitivement" + (f" ({size / 1e9:.1f} Go libérés)" if size else "")
+                + (f", {len(keys) - gone} fichier(s) n'ont pas pu être supprimé(s)" if gone < len(keys) else ""))
     return rec
 
 
+def delete_files(keys):
+    """Supprime des fichiers du stockage, 8 à la fois. -> nombre supprimés (une erreur réseau laisse le fichier, sans bloquer)."""
+    import s3
+    from concurrent.futures import ThreadPoolExecutor
+
+    def one(k):
+        try:
+            s3.delete(k)
+            return 1
+        except OSError:
+            return 0
+    with ThreadPoolExecutor(8) as ex:
+        return sum(ex.map(one, keys))
+
+
 def purge_trash(db, ids):
-    """Après un export : la vidéo et la vignette des extraits à la poubelle sont supprimées ; leur fiche part dans
-    data/clips_archive.jsonl (pour apprendre de vos choix) et leur passage reste noté dans la source (« trashed ») pour
-    qu'une réanalyse ne le repropose pas. -> (nombre, octets libérés)"""
+    """Après un export : les extraits à la poubelle sortent de la base ; leur fiche part dans data/clips_archive.jsonl (pour
+    apprendre de vos choix) et leur passage reste noté dans la source (« trashed ») pour qu'une réanalyse ne le repropose pas.
+    -> (nombre, octets libérés, fichiers à supprimer du stockage : par l'appelant, hors du verrou de la base)"""
     gone, size = [c for c in db["clips"].values() if c["status"] == "trash" and c["id"] in ids], 0
     with ARCHIVE.open("a", encoding="utf-8") as arch:
         for c in gone:
             s = db["sources"].get(c["source_id"]) or {}
             arch.write(json.dumps({**c, **{k: s.get(k) for k in ("streamer", "title", "url", "platform")}, "purged": store.now()},
                                   ensure_ascii=False) + "\n")
+    keys = []
     for c in gone:
-        for rel in (c.get("file"), c.get("thumb")):
-            f = store.DATA / rel if rel else None
-            if f and f.is_file():
-                size += f.stat().st_size
-                f.unlink()
+        keys += [k for k in (c.get("file"), c.get("thumb")) if k]
+        size += c.get("bytes") or 0
         s = db["sources"].get(c["source_id"])
         if s is not None:
             s.setdefault("trashed", []).append([round(c["src_start"] + c["in"], 2), round(c["src_start"] + c["out"], 2)])
         del db["clips"][c["id"]]
-    return len(gone), size
+    return len(gone), size, keys

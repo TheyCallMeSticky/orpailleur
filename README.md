@@ -2,6 +2,18 @@
 
 Dashboard pour fabriquer des best-of d'environ 10 minutes à partir des streams GTA 6 de tes streamers suivis.
 
+**Qui fait quoi** (tout marche sans ton PC, tant qu'un PC avec le moteur est allumé) :
+
+| Où | Rôle |
+|---|---|
+| **Stockage S3** (OVH) | tous les fichiers : extraits, vignettes, musiques, vidéos envoyées, exports |
+| **PC avec le moteur** (le tien, ceux des amis) | tout le travail sur les vidéos : analyse (chat, audio, Whisper), téléchargement des extraits, vignettes, découpes, vidéos ajoutées à la main, « 30 s avant », export |
+| **Serveur** (le site) | l'affichage, la base, la file des tâches, Claude (choix des moments), la recherche des VODs, la description ; **aucun traitement vidéo, pas besoin de ffmpeg** |
+
+Les navigateurs et les moteurs lisent et écrivent directement sur S3 avec des liens signés par le site (12 h pour lire, 24 h pour
+les moteurs) : les clés S3 ne quittent jamais le serveur. Sans aucun PC allumé, on peut trier, ranger le best-of et regarder les
+vidéos ; les nouveaux extraits, l'export et « 30 s avant » attendent un PC (« Aucun PC allumé »).
+
 1. **Vidéos** : les VODs gratuites terminées depuis moins de 24 h des streamers suivis (Twitch, YouTube, Kick), rangées par jour
    (**Aujourd'hui / Hier / Plus ancien**) et par état (**À faire / Faites**), mises à jour au lancement puis toutes les heures.
    Les nouvelles VODs sur GTA partent toutes seules en analyse ; chaque analyse lit la VOD en entier et garde au plus 10 extraits,
@@ -31,8 +43,8 @@ Dashboard pour fabriquer des best-of d'environ 10 minutes à partir des streams 
 Chaque tâche (analyse, recherche, export) écrit son journal complet dans `data/logs/<jour>/<heure>_<type>_<id>.log`, avec la
 durée de chaque étape (lecture du lien, chat, téléchargement et analyse de l'audio, attente de la carte graphique, Whisper,
 Claude, téléchargement des extraits) et une ligne « Durées : … » à la fin. Les durées d'une analyse réussie sont aussi gardées
-dans la base et affichées dans « voir les extraits » d'une VOD. `data/tmp` (audio et chat gardés pour une réanalyse) est vidé
-des fichiers qui n'ont pas servi depuis 36 h.
+dans la base et affichées dans « voir les extraits » d'une VOD. Le journal d'une tâche faite par un moteur arrive en entier à la
+fin (lignes « [moteur] ») avec ses durées ; pendant qu'elle tourne, l'onglet Machines montre son étape et sa dernière ligne.
 
 ## Sélection des extraits
 
@@ -54,6 +66,19 @@ sudo apt update && sudo apt install -y ffmpeg python3-venv python3-pip
 cd ~/youtube/bestof && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ```
 Claude Code doit être installé et connecté (`claude`). Sans carte NVIDIA, Whisper tourne sur le processeur (plus lent).
+Le serveur seul (sans moteur, `--no-engine`) n'a besoin que de Python, `yt-dlp` et Claude Code : pas de ffmpeg.
+
+### Le stockage S3 (une fois)
+
+OVH Public Cloud > Object Storage : un conteneur « API compatible S3 » (Gravelines, sans versioning ni Object Lock) et un
+utilisateur S3 qui lui est réservé. Puis, sur le serveur :
+```bash
+python s3.py setup      # adresse, région et conteneur pré-remplis ; la clé secrète se tape sans s'afficher
+```
+Les clés vont dans `data/s3.json` (lisible par toi seul, jamais dans le dépôt). Le script vérifie l'écriture, la lecture et la
+suppression, puis autorise les envois depuis la page (CORS). Pour copier des fichiers déjà sur le disque :
+`python s3.py push data/media media` (et `data/exports exports`, `data/inbox inbox`) ; un fichier déjà envoyé est sauté.
+Sans `data/s3.json`, les fichiers restent dans `data/` et le site les sert lui-même (mode local : tests, ou une seule machine).
 
 ## Lancer
 
@@ -74,15 +99,20 @@ Deux personnes peuvent trier en même temps sans tomber sur le même extrait. To
 
 ## Moteurs : plusieurs machines analysent en même temps
 
-Ce PC est le **serveur** (le site, la file, le tri, l'export, Claude avec ton compte, le téléchargement des extraits). Chaque
-**moteur** (ce PC, le PC d'un ami, un Mac) prend une VOD en attente, fait la partie lourde chez lui (chat, audio, Whisper sur sa
-carte graphique) et renvoie seulement les passages candidats et leur transcription (environ 100 Ko). Une seule analyse à la fois
-par machine : 2 Whisper sur la même carte ne vont pas plus vite (mesuré : +24 % à 2, 0 % à 3).
+Le **serveur** garde la file, le tri et Claude (avec ton compte). Chaque **moteur** (ce PC, le PC d'un ami) prend du travail :
+- une **VOD** à analyser (chat, audio, Whisper sur sa carte graphique) : il renvoie les passages candidats et leur transcription
+  (environ 100 Ko), Claude choisit sur le serveur ;
+- une **tâche** : télécharger les extraits retenus (1080p, vignette), une vidéo ajoutée à la main, « 30 s avant », un export.
+
+Une seule analyse à la fois par machine (2 Whisper sur la même carte ne vont pas plus vite : +24 % à 2, 0 % à 3) ; les autres
+tâches passent en plus (3 au plus). Priorités : « 30 s avant », export, extraits, vidéos ajoutées, puis VODs. **L'export** se fait
+sur le PC de la personne qui clique (même adresse que son navigateur), sinon sur le premier PC en ligne ; **Arrêter maintenant**
+sur cette machine l'annule. Un redémarrage du site ne perd rien : les moteurs continuent et le site reprend leurs tâches.
 
 Dans l'onglet **Machines** : chaque machine, la VOD qu'elle traite et l'étape en cours. **Arrêter après les fichiers en cours**
 (elle finit puis ne prend plus rien), **Arrêter maintenant** (la VOD en cours repart en file pour une autre machine),
-**Reprendre**, **Retirer** (son accès est supprimé). Une machine éteinte ou déconnectée rend ses VODs au bout de 2 min.
-Quand ce PC est éteint, les moteurs attendent et reprennent seuls.
+**Reprendre**, **Retirer** (son accès est supprimé). Une machine éteinte ou déconnectée rend ses VODs et ses tâches au bout de
+2 min. Quand le serveur est injoignable, les moteurs attendent et reprennent seuls.
 
 ### Une fois : Tailscale (le site n'est visible que de toi et de tes amis, rien n'est ouvert sur internet)
 
@@ -133,18 +163,19 @@ NVIDIA (Mac), Whisper tourne sur le processeur avec un modèle plus petit : plus
 ## Fichiers
 
 ```
-app.py            serveur web + API (bibliothèque standard Python)
+app.py            serveur web + API (bibliothèque standard Python), liens /files/ vers le stockage
+s3.py             stockage : liens signés S3 (OVH) ou mode local ; python s3.py setup | push
 vods.py           liste des VODs des streamers suivis
-collect.py        analyse d'une VOD : signaux, sélection, téléchargement
+collect.py        site : Claude, fiches des extraits ; moteur : détection, téléchargement des extraits, ajouts, « 30 s avant »
 ai.py             Whisper + Claude
 transcribe_win.py transcription Whisper (processus séparé, GPU)
-montage.py        ordre auto, alertes, description, CSV, export MP4 + FCPXML
+montage.py        ordre auto, alertes, description, CSV ; export : instantané (site), fabrication MP4 + FCPXML (moteur), fiche (site)
 store.py, jobs.py base JSON (data/db.json) et tâches de fond
-engines.py        file des moteurs côté serveur : baux, résultats, finalisation (Claude + extraits), machines
-moteur.py         moteur d'analyse (une VOD par processus enfant, arrêtable à tout moment)
+engines.py        files des moteurs côté serveur : VODs, tâches, baux, liens signés, résultats, machines
+moteur.py         moteur (une VOD ou une tâche par processus enfant, arrêtable à tout moment)
 moteur/           installation et lanceur du moteur pour Windows (PowerShell) et Mac
 selftest.py       tests (.venv/bin/python selftest.py)
 static/           dashboard
 vendor/           modules repris de gta6-clipper (MIT)
-data/             vidéos, base, exports : à sauvegarder (data/logs : journaux, data/tmp : caches, data/moteur : moteur de ce PC)
+data/             base, réglages, clés S3 (s3.json) : à sauvegarder (data/logs : journaux, data/moteur : moteur de ce PC)
 ```

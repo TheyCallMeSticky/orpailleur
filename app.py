@@ -19,6 +19,7 @@ import collect
 import engines
 import jobs
 import montage
+import s3
 import store
 import vods
 
@@ -46,8 +47,8 @@ SETTINGS = ("fps", "lower_third", "max_moments", "ai")
 
 
 def vod_rows(db):
-    """VODs < 24 h + leur état : nouvelle / en attente (file des moteurs) / en cours (sur une machine) / finalisation (Claude
-    + extraits sur ce PC) / analysée (n extraits)."""
+    """VODs < 24 h + leur état : nouvelle / en attente (file des moteurs) / en cours (sur une machine) / finalisation (Claude,
+    puis extraits en attente d'un moteur) / analysée (n extraits)."""
     by_url = {s["url"]: s["id"] for s in db["sources"].values()}
     count = {}
     found = set()  # sources avec au moins un extrait trouvé par une analyse (pas seulement des passages ajoutés à la main)
@@ -57,7 +58,7 @@ def vod_rows(db):
         if not str(c.get("why") or "").startswith("ajouté"):
             found.add(c["source_id"])
     busy = {j.label: j.status for j in jobs.JOBS.values() if j.kind == "collect" and j.status in ("en attente", "en cours")}
-    run, pend = engines.running(), set(db.get("pending", []))
+    run, pend, turls = engines.running(), set(db.get("pending", [])), engines.task_urls()
     scan_t = time.mktime(time.strptime(db["vods_scan"], "%Y-%m-%d %H:%M:%S")) if db.get("vods_scan") else time.time()
     out = []
     for v in (db.get("vods") or {}).values():
@@ -74,6 +75,8 @@ def vod_rows(db):
             v.update(run[v["url"]])  # machine, step
         elif engines.result_file(v["url"]).exists():
             v["state"] = "finalisation"
+        elif v["url"] in turls:
+            v["state"], v["step"] = "finalisation", "Téléchargement des extraits"
         elif v["url"] in pend:
             v["state"] = "en attente"
         else:  # busy : analyse lancée à la main (lien collé)
@@ -109,22 +112,6 @@ def auto_queue():
         print(f"  {n} nouvelle(s) VOD(s) GTA mise(s) en analyse", flush=True)
 
 
-def clean_tmp(hours=36):
-    """data/tmp garde l'audio et le chat pour une réanalyse ; un fichier qui n'a pas servi depuis 36 h (la VOD est sortie
-    de la liste des 24 h) est supprimé. Un cache réutilisé est « touché », donc jamais supprimé en cours d'analyse."""
-    lim, freed = time.time() - hours * 3600, 0
-    for f in store.TMP.iterdir():
-        try:
-            st = f.stat()
-            if f.is_file() and st.st_mtime < lim:
-                f.unlink()
-                freed += st.st_size
-        except OSError:
-            pass
-    if freed:
-        print(f"  data/tmp : {freed / 1e9:.1f} Go libérés", flush=True)
-
-
 def resume_pending():
     with store.tx() as db:  # une VOD sortie de la liste des 24 h pendant l'arrêt ne sera plus lancée : on la retire de la file
         p = db["pending"] = [u for u in db.get("pending", []) if u in db.get("vods", {})]
@@ -146,7 +133,6 @@ def _hourly():
             while j and j.status in ("en attente", "en cours"):
                 time.sleep(5)
             auto_queue()
-            clean_tmp()
         except Exception as e:  # noqa: BLE001
             print("scan:", e, flush=True)
         time.sleep(3600)
@@ -270,7 +256,8 @@ def patch_project(body):
 
 
 def recv(rfile, size, dst):
-    """Corps brut d'un envoi de fichier (size octets) -> dst."""
+    """Corps brut d'un envoi de fichier (size octets) -> dst (stockage local seulement)."""
+    dst.parent.mkdir(parents=True, exist_ok=True)
     with dst.open("wb") as f:
         while size > 0:
             chunk = rfile.read(min(1 << 20, size))
@@ -282,24 +269,35 @@ def recv(rfile, size, dst):
 
 MUSIC_EXT = ("mp3", "m4a", "aac", "wav", "ogg", "opus", "flac")
 MUSIC_MAX = 60 << 20
+UPLOAD_MAX = 5 << 30  # 5 Go : un seul envoi S3
 
 
-def add_music(name, size, rfile, by=""):
-    """Musique de fond envoyée depuis le dashboard : format et poids vérifiés avant l'envoi, puis il faut un son d'au moins 10 s."""
+def music_start(name, size, dur):
+    """Musique de fond : format, poids et durée (lue par le navigateur, 10 s minimum) vérifiés avant l'envoi direct au
+    stockage. -> lien d'envoi et fiche à confirmer avec music_done."""
     stem, ext = os.path.splitext(os.path.basename(str(name).replace("\\", "/")))
     ext = ext.lower().lstrip(".")
     if ext not in MUSIC_EXT:
         raise ValueError("Format de musique non pris en charge : MP3, M4A, AAC, WAV, OGG, OPUS ou FLAC.")
-    if size > MUSIC_MAX:
+    if not isinstance(size, int) or not 0 < size <= MUSIC_MAX:
         raise ValueError("Musique trop lourde : 60 Mo maximum.")
+    if not isinstance(dur, (int, float)) or dur != dur:
+        raise ValueError("Ce fichier n'est pas une musique lisible.")
+    if dur < 10:
+        raise ValueError("Musique trop courte : 10 s minimum.")
     mid = store.uid()
-    dst = store.MUSIC / f"{mid}.{ext}"
-    recv(rfile, size, dst)
-    p = collect.probe(dst)
-    if not p["audio"] or p["dur"] < 10:
-        dst.unlink(missing_ok=True)
-        raise ValueError("Musique trop courte : 10 s minimum." if p["audio"] else "Ce fichier n'est pas une musique lisible.")
-    t = {"id": mid, "name": stem.strip()[:100] or "Musique", "file": f"media/music/{dst.name}", "dur": round(p["dur"], 1),
+    key = f"media/music/{mid}.{ext}"
+    return {"id": mid, "key": key, "put": s3.url("PUT", key, 3600), "name": stem.strip()[:100] or "Musique", "dur": round(float(dur), 1)}
+
+
+def music_done(b, by=""):
+    mid, key = str(b.get("id") or ""), str(b.get("key") or "")
+    if not re.fullmatch(r"\w{10}", mid) or not re.fullmatch(rf"media/music/{mid}\.(?:{'|'.join(MUSIC_EXT)})", key):
+        raise ValueError("envoi inconnu")
+    dur = b.get("dur")
+    if not isinstance(dur, (int, float)) or not 10 <= dur <= 36000:
+        raise ValueError("Musique trop courte : 10 s minimum.")
+    t = {"id": mid, "name": str(b.get("name") or "Musique").strip()[:100] or "Musique", "file": key, "dur": round(float(dur), 1),
          "added": store.now(), "by": by}
     with store.tx() as db:
         db["music"][mid] = t
@@ -315,7 +313,7 @@ def del_music(mid):
         if not t:
             raise KeyError("musique introuvable")
         db["project"]["music"] = [m for m in db["project"].get("music", []) if m != mid]
-    (store.DATA / t["file"]).unlink(missing_ok=True)
+    s3.delete(t["file"])
     return {"ok": True}
 
 
@@ -408,6 +406,21 @@ class H(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             pass
 
+    def signed_file(self, method, key, q):
+        """Stockage local (sans S3) : lien signé par le site (s3.url). GET = lire, PUT = écrire (moteurs, envois du navigateur)."""
+        e, t = q.get("e", [""])[0], q.get("t", [""])[0]
+        if s3.conf() or not s3.ok_key(key) or not s3.local_ok(method, key, e, t):
+            return self.send_json({"error": "lien invalide ou expiré"}, 403)
+        p = store.DATA / key
+        if method == "GET":
+            return self.send_file(p, "dl" in q) if p.is_file() else self.send_json({"error": "fichier introuvable"}, 404)
+        if method == "PUT":
+            part = p.with_name(p.name + ".part")
+            recv(self.rfile, int(self.headers.get("Content-Length") or 0), part)
+            os.replace(part, p)
+            return self.send_json({"ok": True})
+        return self.send_json({"error": "méthode non prise en charge"}, 405)
+
     # ------------------------------------------------ accès
     def authed(self, q):
         tok = CONF["token"]
@@ -423,13 +436,21 @@ class H(BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length") or 0)
         return json.loads(self.rfile.read(n) or b"{}") if n else {}
 
-    def add_video(self, label, inp, n, window, streamer, mode, audio=True):
-        """Vidéo ajoutée à la main (lien ou fichier) : mode "whole" (telle quelle dans le Tri) | "auto" (meilleurs moments) |
-        None (vidéo courte = whole, sinon auto). Passage et mode vérifiés ici : une erreur de saisie répond tout de suite."""
+    def add_video(self, label, n, window, streamer, mode, url=None, key=None, name=""):
+        """Vidéo ajoutée à la main (lien, ou fichier déjà envoyé sur le stockage) : tâche « add » pour un moteur. mode "whole"
+        (telle quelle dans le Tri) | "auto" (meilleurs moments) | None (vidéo courte = whole, sinon auto). Passage et mode
+        vérifiés ici : une erreur de saisie répond tout de suite."""
         check_add(mode, window)
         by = "" if self.user() == "?" else self.user()
-        return jobs.submit("collect", "collect", label, lambda j: collect.collect(j, inp, n, window, streamer, audio, mode=mode,
-                                                                                  by=by)).view()
+        with store.lock:
+            taken = collect.taken_for(store.load(), url) if url else []
+        data = {"input": url, "key": key, "name": name, "mode": mode, "window": window, "streamer": streamer, "max_n": n,
+                "by": by, "ai": bool(CONF.get("ai", True)), "taken": taken, "cid": store.uid()}
+        return engines.add_task("add", label, data).view()
+
+    def ip(self):
+        """Adresse du navigateur ou du moteur (tailscale serve la donne dans X-Forwarded-For) : même PC = même adresse."""
+        return (self.headers.get("X-Forwarded-For") or "").split(",")[0].strip() or self.client_address[0]
 
     def engine_route(self, method, path, q):
         """Moteurs : jeton de machine (en-tête X-Machine, ou ?m= pour le script d'installation) à la place du cookie."""
@@ -439,7 +460,8 @@ class H(BaseHTTPRequestHandler):
         name = engines.machine_name(self.headers.get("X-Machine") or "")
         if not name:
             return self.send_json({"ok": False, "error": "Machine inconnue : elle a été retirée du site, ou le lien d'installation est faux."}, 401)
-        fn = {"/api/engine/beat": engines.beat, "/api/engine/result": engines.result, "/api/engine/release": engines.release}.get(path)
+        fn = {"/api/engine/beat": lambda n, b: engines.beat(n, b, self.ip()), "/api/engine/result": engines.result,
+              "/api/engine/release": engines.release, "/api/engine/sign": engines.sign, "/api/engine/done": engines.done}.get(path)
         if method != "POST" or not fn:
             return self.send_json({"ok": False, "error": "introuvable"}, 404)
         if int(self.headers.get("Content-Length") or 0) > 50 << 20:
@@ -457,6 +479,8 @@ class H(BaseHTTPRequestHandler):
         q = urllib.parse.parse_qs(u.query)
         if u.path.startswith(("/api/engine/", "/moteur/")):
             return self.engine_route(method, u.path, q)
+        if u.path.startswith("/files/") and "t" in q:  # stockage local : lien signé par le site (moteurs, envois)
+            return self.signed_file(method, urllib.parse.unquote(u.path[len("/files/"):]), q)
         auth = self.authed(q)
         if not auth:
             return self.send_text("<h1>Accès privé</h1><p>Ouvre le lien complet (avec ?k=…) donné au lancement.</p>",
@@ -477,10 +501,18 @@ class H(BaseHTTPRequestHandler):
                 p = (STATIC if base == "static" else store.ROOT / "fonts") / name
                 ok = name and "/" not in name and ".." not in name and p.is_file()
                 return self.send_file(p) if ok else self.send_json({"error": "fichier introuvable"}, 404)
-            if method == "GET" and path.startswith("/files/"):
+            if method == "GET" and path.startswith("/files/"):  # S3 : redirection vers un lien signé (12 h)
                 rel = urllib.parse.unquote(path[len("/files/"):])
+                if not s3.ok_key(rel):
+                    return self.send_json({"error": "fichier introuvable"}, 404)
+                if s3.conf():
+                    self.send_response(302)
+                    self.send_header("Location", s3.url("GET", rel, download=Path(rel).name if "dl" in q else None))
+                    self.send_header("Cache-Control", "private, max-age=3600")
+                    self.end_headers()
+                    return
                 p = (store.DATA / rel).resolve()
-                ok = any(p.is_relative_to(d) for d in (store.MEDIA, store.EXPORTS)) and p.is_file()
+                ok = p.is_relative_to(store.DATA) and p.is_file()
                 return self.send_file(p, "dl" in q) if ok else self.send_json({"error": "fichier introuvable"}, 404)
             if method == "GET" and path == "/api/state":
                 return self.send_json(state())
@@ -499,13 +531,12 @@ class H(BaseHTTPRequestHandler):
                                           extra={"Content-Disposition": "attachment; filename=sources.csv"})
             if method == "POST" and path == "/api/collect":
                 b = self.body()
-                inp = str(b.get("input", "")).strip()
-                if not inp:
-                    return self.send_json({"error": "lien vide"}, 400)
+                inp = str(b.get("input", "")).strip().strip('"')
+                if not re.match(r"https?://", inp):
+                    return self.send_json({"error": "Colle un lien (https://…), ou choisis un fichier."}, 400)
                 n = max(1, min(50, int(b.get("max") or CONF["max_moments"] or 10)))
-                return self.send_json(self.add_video(inp[:120], inp, n, str(b.get("window") or ""),
-                                                     str(b.get("streamer") or "").strip(), b.get("mode") or None,
-                                                     bool(b.get("audio", True))))
+                return self.send_json(self.add_video(inp[:120], n, str(b.get("window") or ""),
+                                                     str(b.get("streamer") or "").strip(), b.get("mode") or None, url=inp))
             if method == "POST" and path == "/api/scan":
                 j = scan_now()
                 return self.send_json(j.view() if j else {"status": "déjà en cours"})
@@ -522,30 +553,48 @@ class H(BaseHTTPRequestHandler):
                 return self.send_json(engines.engine_settings(self.body()))
             if method == "POST" and path == "/api/follow":
                 return self.send_json(vods.save_settings(self.body()))
-            if method == "POST" and path == "/api/upload":
-                check_add(q.get("mode", [None])[0], q.get("window", [""])[0])  # avant de recevoir le fichier
-                name = collect.safe_name(q.get("name", ["video.mp4"])[0])
-                dst = store.INBOX / f"{store.uid()}_{name}"
-                recv(self.rfile, int(self.headers.get("Content-Length") or 0), dst)
-                streamer = q.get("streamer", [""])[0]
-                n = max(1, min(50, int(q.get("max", [str(CONF["max_moments"])])[0] or 10)))
-                return self.send_json(self.add_video(name, str(dst), n, q.get("window", [""])[0], streamer, q.get("mode", [None])[0]))
-            if method == "POST" and path == "/api/music/upload":
-                return self.send_json(add_music(q.get("name", [""])[0], int(self.headers.get("Content-Length") or 0), self.rfile,
-                                                "" if self.user() == "?" else self.user()))
+            if method == "POST" and path == "/api/upload/start":  # fichier vidéo : le navigateur l'envoie au stockage
+                b = self.body()
+                check_add(b.get("mode") or None, str(b.get("window") or ""))  # avant d'envoyer le fichier
+                if not isinstance(b.get("size"), int) or not 0 < b["size"] <= UPLOAD_MAX:
+                    return self.send_json({"error": "Fichier trop lourd : 5 Go maximum."}, 400)
+                key = f"inbox/{store.uid()}_{collect.safe_name(str(b.get('name') or 'video.mp4'))}"
+                return self.send_json({"key": key, "put": s3.url("PUT", key, 6 * 3600)})
+            if method == "POST" and path == "/api/upload/done":
+                b = self.body()
+                key = str(b.get("key") or "")
+                if not re.fullmatch(r"inbox/\w{10}_[A-Za-z0-9._-]{1,80}", key):
+                    return self.send_json({"error": "envoi inconnu"}, 400)
+                n = max(1, min(50, int(b.get("max") or CONF["max_moments"] or 10)))
+                name = key.split("_", 1)[1]
+                return self.send_json(self.add_video(name, n, str(b.get("window") or ""), str(b.get("streamer") or "").strip(),
+                                                     b.get("mode") or None, key=key, name=name))
+            if method == "POST" and path == "/api/music/start":
+                b = self.body()
+                return self.send_json(music_start(b.get("name", ""), b.get("size"), b.get("dur")))
+            if method == "POST" and path == "/api/music/done":
+                return self.send_json(music_done(self.body(), "" if self.user() == "?" else self.user()))
             if method == "POST" and re.fullmatch(r"/api/music/\w+/delete", path):
                 return self.send_json(del_music(path.split("/")[3]))
             if method == "POST" and path.startswith("/api/clip/") and path.endswith("/extend"):  # « Récupérer 30 s avant »
-                c, delta = collect.extend_before(path.split("/")[3])
-                return self.send_json({"clip": c, "delta": round(delta, 2)})
+                d = collect.extend_request(path.split("/")[3])
+                m = engines.export_machine(self.ip())  # le PC de la personne d'abord, comme pour l'export
+                if not m:
+                    return self.send_json({"error": "Aucun PC allumé : lance le moteur sur ton PC, puis réessaie."}, 400)
+                return self.send_json(engines.add_task("extend", f"30 s avant : {d['streamer'] or d['cid']}", d, m).view())
             if method == "POST" and path.startswith("/api/clip/"):
                 return self.send_json(patch_clip(path.rsplit("/", 1)[1], self.body(), self.user()))
             if method == "POST" and path.startswith("/api/source/"):
                 return self.send_json(patch_source(path.rsplit("/", 1)[1], self.body()))
             if method == "POST" and path == "/api/project":
                 return self.send_json(patch_project(self.body()))
-            if method == "POST" and path == "/api/export":
-                j = jobs.submit("export", "export", store.load()["project"]["name"], montage.export)
+            if method == "POST" and path == "/api/export":  # fabriqué par un PC : celui de la personne, sinon le premier en ligne
+                m = engines.export_machine(self.ip())
+                if not m:
+                    return self.send_json({"error": "Aucun PC allumé : lance le moteur sur ton PC (ou demande à un ami), puis réessaie."}, 400)
+                d = montage.snapshot()
+                j = engines.add_task("export", f"{d['db']['project']['name']} — sur {m}", d, m)
+                j.log(f"Demandé depuis {self.ip()} : export sur {m}")
                 return self.send_json(j.view())
             if method == "POST" and path == "/api/settings":
                 b = self.body()
@@ -571,6 +620,9 @@ class H(BaseHTTPRequestHandler):
     def do_POST(self):
         self.route("POST")
 
+    def do_PUT(self):
+        self.route("PUT")
+
 
 ENGINE = [None]  # processus du moteur de ce PC
 
@@ -595,7 +647,8 @@ def main():
     a = ap.parse_args()
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))  # kill : passe aussi par le finally (arrêt du moteur de ce PC)
     srv = ThreadingHTTPServer((a.host, a.port), H)
-    engines.local_token()  # la machine « Ce PC » existe toujours
+    if not a.no_engine:
+        engines.local_token()  # la machine « Ce PC » (son moteur est lancé par ce site)
     resume_pending()
     if not a.no_engine:
         threading.Thread(target=local_engine, args=(a.port,), daemon=True).start()

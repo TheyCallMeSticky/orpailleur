@@ -106,6 +106,23 @@ def submit(queue_name, kind, label, fn, *args):
     return j
 
 
+def track(kind, label):
+    """Tâche faite par un moteur : affichée comme les autres, mise à jour par engines.py (pas de fil ici)."""
+    j = Job(kind, label, None, ())
+    JOBS[j.id] = j
+    return j
+
+
+def close(j, ok, err=""):
+    if j.status in ("terminé", "erreur"):
+        return
+    j.status = "terminé" if ok else "erreur"
+    j.log("Terminé.") if ok else j.log("ERREUR :", err)
+    if j.steps:
+        j.log("Durées : " + " · ".join(f"{n} {hms(d)}" for n, d in j.steps) + (f" · total {hms(j.elapsed())}" if j.t0 else ""))
+    j.ended = store.now()
+
+
 def listing(n=25):
     """En cours d'abord (toujours toutes), puis erreurs / terminées récentes, puis en attente (dans l'ordre où elles passeront)."""
     rank = {"en cours": 0, "erreur": 1, "terminé": 1, "en attente": 2}

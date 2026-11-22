@@ -655,6 +655,27 @@ function toast(t){ const d = document.createElement("div"); d.className="toast";
 // un bouton cliqué à la souris rend le focus : Espace / Entrée restent des raccourcis au lieu de recliquer dessus
 document.addEventListener("click", e => { const b = e.target.closest("button"); if (b && e.detail) b.blur(); });
 
+function putFile(url, f, onp){  // envoi direct au stockage (lien signé par le site), avec la progression tous les 10 %
+  return new Promise((ok, ko) => {
+    const x = new XMLHttpRequest(); let last = -10;
+    x.open("PUT", url);
+    x.upload.onprogress = e => { const p = e.lengthComputable ? Math.floor(e.loaded / e.total * 100) : -1; if (onp && p >= last + 10) { last = p; onp(p); } };
+    x.onload = () => x.status < 300 ? ok() : ko(new Error("HTTP " + x.status));
+    x.onerror = () => ko(new Error("réseau"));
+    x.send(f);
+  });
+}
+async function waitJob(id, maxMin = 15){  // tâche faite par un PC : on suit son avancée jusqu'à la fin
+  const end = Date.now() + maxMin * 60e3;
+  while (Date.now() < end) {
+    await new Promise(r => setTimeout(r, 2000));
+    const v = await api("/api/job/" + id);
+    if (v.status === "terminé" || v.status === "erreur") return v;
+  }
+  return null;
+}
+const jobErr = v => ((v.lines.find(l => /ERREUR :/.test(l)) || "").split("ERREUR :")[1] || "").trim();
+
 async function api(path, body){
   const o = {headers:{"X-User": encodeURIComponent(me||"?")}};
   if (body !== undefined){ o.method="POST"; o.headers["Content-Type"]="application/json"; o.body=JSON.stringify(body); }
@@ -764,12 +785,16 @@ function makeEditor(root, loop, tools = root){
     if (!c) return; if (sg.length < 2) return toast("Il faut garder au moins un morceau");
     sg = sg.filter((_, k) => k !== sel); sel = Math.min(sel, sg.length - 1); free = false; draw();
   }
-  async function more(){  // retélécharge l'extrait avec 30 s de plus au début ; les réglages en cours suivent le décalage
-    if (!c) return; const b = q("[data-a=more]"), id = c.id; b.disabled = true; toast("Récupération des 30 s d'avant…");
+  async function more(){  // un PC retélécharge l'extrait avec 30 s de plus au début ; les réglages en cours suivent le décalage
+    if (!c) return; const b = q("[data-a=more]"), id = c.id; b.disabled = true;
     try {
-      const r = await api("/api/clip/" + id + "/extend", {});
+      const j = await api("/api/clip/" + id + "/extend", {});
+      toast("Récupération des 30 s d'avant : un PC s'en occupe…");
+      const v = await waitJob(j.id);
+      if (!v) return toast("Toujours en attente d'un PC : réessaie plus tard");
+      if (v.status === "erreur") return toast("Récupération impossible : " + shortErr(jobErr(v)) + " — l'extrait reste tel quel");
       if (!c || c.id !== id) return;  // on est passé à un autre extrait entre-temps
-      const d = r.delta;
+      const r = v.result, d = r.delta;
       load({...c, ...r.clip, segs: sg.map(([x, y]) => [r2(x + d), r2(y + d)])}, false);
       seek(Math.max(0, sg[0][0] - d)); play();  // on joue depuis le début de ce qui vient d'être ajouté
       toast(`${Math.round(d)} s ajoutées avant : élargis le début (−1 s ou en tirant le bord rose)`);
@@ -855,14 +880,14 @@ async function addVideo(mode){  // mode : "whole" | "auto" | undefined (le serve
   const sec = t => t.split(":").reduce((a, x) => a * 60 + +x, 0);
   if (to && sec(to) <= sec(from || "0")) return toast("La fin du passage doit être après le début");
   const win = to ? (from || "0:00") + "-" + to : "";
-  if (f) {
+  if (f) {  // le fichier part directement sur le stockage, puis un PC s'en occupe
+    const opts = {window:win, streamer, max:S.settings.max_moments, ...(mode ? {mode} : {})};
+    let st;
+    try { st = await api("/api/upload/start", {name:f.name, size:f.size, ...opts}); } catch (e) { return; }  // passage ou taille refusés
     toast("Envoi de " + f.name + "…");
-    const q = new URLSearchParams({name:f.name, max:S.settings.max_moments, window:win, streamer});
-    if (mode) q.set("mode", mode);
-    let r;
-    try { r = await fetch("/api/upload?" + q, {method:"POST", body:f, headers:{"X-User":encodeURIComponent(me)}}); }
-    catch (e) { return toast("Échec de l'envoi : vérifie le passage et ta connexion"); }  // refus du serveur avant la fin de l'envoi
-    if (!r.ok) { let m = "Échec de l'envoi"; try { m = (await r.json()).error || m; } catch(e){} return toast(m); }
+    try { await putFile(st.put, f, p => toast(`Envoi de ${f.name} : ${p} %`)); }
+    catch (e) { return toast("Échec de l'envoi de " + f.name + " : vérifie ta connexion"); }
+    await api("/api/upload/done", {key:st.key, ...opts});
     $("#aFile").value = "";
   } else {
     await api("/api/collect", {input, streamer, window:win, ...(mode ? {mode} : {})});
@@ -919,7 +944,7 @@ function vodRow(v){
   } else if (v.state === "en attente") {
     Object.assign(r, {rank:1, state:`<span class="warn">en file</span>`, acts:""});
   } else {
-    const w = stepWord(v.state === "finalisation" ? "Claude" : v.step);
+    const w = stepWord(v.state === "finalisation" ? (v.step || "Claude") : v.step);
     Object.assign(r, {rank:2, acts:"", state:`<span class="run">en cours${v.machine ? " chez " + esc(v.machine) : ""}${w ? " · " + w : ""}</span>`});
   }
   return r;
@@ -1123,7 +1148,7 @@ async function renderJobs(){
   const full = {};
   for (const id of openJobs) { try { full[id] = await api("/api/job/" + id); } catch(e){} }
   el.innerHTML = S.jobs.map(j => `<div class="job">
-    <div class="row"><span class="st ${esc(j.status)}">${esc(j.status)}</span><b>${j.kind==="export"?"Export":j.kind==="scan"?"Recherche":j.kind==="finish"?"Finalisation":"Analyse"}</b>
+    <div class="row"><span class="st ${esc(j.status)}">${esc(j.status)}</span><b>${j.kind==="export"?"Export":j.kind==="scan"?"Recherche":j.kind==="finish"?"Finalisation":j.kind==="extend"?"30 s avant":"Analyse"}</b>
     <span class="muted" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(j.label)}</span>
     <a href="#" data-j="${esc(j.id)}">${openJobs.has(j.id)?"réduire":"journal complet"}</a></div>
     <pre>${esc((full[j.id]||j).lines.join("\n"))}</pre></div>`).join("");
@@ -1326,15 +1351,19 @@ function renderMusic(){
 au.onplay = au.onpause = renderMusic;
 $("#muTr").onchange = () => saveProject({transitions: $("#muTr").checked});
 $("#muOn").onchange = () => saveProject({music_on: $("#muOn").checked});
+const audioDur = f => new Promise(ok => {  // durée lue par le navigateur (le site ne touche pas aux fichiers) ; NaN si illisible
+  const a = new Audio(), u = URL.createObjectURL(f), end = d => { URL.revokeObjectURL(u); ok(d); };
+  a.preload = "metadata"; a.onloadedmetadata = () => end(a.duration); a.onerror = () => end(NaN); a.src = u;
+});
 $("#muFile").onchange = async e => {  // une par une, un message par fichier
   const fs = [...e.target.files]; e.target.value = "";
   for (const f of fs) {
-    let r, j = {};
-    try { r = await fetch("/api/music/upload?" + new URLSearchParams({name: f.name}), {method:"POST", body:f, headers:{"X-User":encodeURIComponent(me)}}); }
-    catch (err) { toast("Échec de l'envoi de " + f.name); continue; }
-    try { j = await r.json(); } catch (err) {}
-    toast(r.ok ? "Musique ajoutée : " + j.name : j.error || "Échec de l'envoi de " + f.name);
-    if (r.ok) refresh();
+    let st;
+    const dur = await audioDur(f);
+    try { st = await api("/api/music/start", {name:f.name, size:f.size, dur: isFinite(dur) ? dur : null}); } catch (err) { continue; }  // refus déjà affiché
+    try { await putFile(st.put, f); } catch (err) { toast("Échec de l'envoi de " + f.name); continue; }
+    const t = await api("/api/music/done", {id:st.id, key:st.key, name:st.name, dur:st.dur}).catch(() => null);
+    if (t) { toast("Musique ajoutée : " + t.name); refresh(); }
   }
 };
 // icônes dessinées (le « ＋ » pleine chasse n'était pas centré dans son rond)
@@ -1384,7 +1413,10 @@ function confirmBtn(btn, label, fn){
 }
 $("#pClear").onclick = e => confirmBtn(e.currentTarget, "Confirmer : vider ?", () => saveProject({items:[]}));
 $("#pNew").onclick = e => confirmBtn(e.currentTarget, "Confirmer : archiver ce best-of ?", () => saveProject({auto:"new"}));
-$("#pExport").onclick = async () => { await api("/api/export", {}); toast("Export lancé : ça peut prendre quelques minutes"); refresh(); };
+$("#pExport").onclick = async () => {  // fabriqué par un PC : le tien s'il est allumé, sinon le premier en ligne
+  const r = await api("/api/export", {});
+  toast("Export lancé " + (r.label.split(" — ")[1] || "") + " : ça peut prendre quelques minutes"); refresh();
+};
 $("#sFps").onchange = $("#sLower").onchange = async () => {
   S.settings = await api("/api/settings", {fps:$("#sFps").value, lower_third:$("#sLower").checked}); toast("Réglage enregistré"); };
 

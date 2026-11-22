@@ -186,22 +186,52 @@ def thumb(file, t, cid):
     return f"media/thumbs/{cid}.jpg" if out.exists() else ""
 
 
-def add_clip(src, file, src_start, win_in, win_out, why, score, ai=None):
-    p = probe(file)
-    if not p["w"] or p["dur"] < 1:  # fichier vide ou sans image : c'est un échec, pas un extrait noir dans le Tri
-        Path(file).unlink(missing_ok=True)
-        raise RuntimeError("fichier téléchargé vide ou sans image")
-    d = p["dur"]
+def _window(d, win_in, win_out):
+    """Début et fin de la sélection dans un fichier de d secondes (tout le fichier si le passage est trop court)."""
     a = min(max(0.0, win_in or 0.0), max(0.0, d - 1))
     b = min(d, win_out) if win_out else d
-    if b - a < 1:
-        a, b = 0.0, d
-    cid = Path(file).stem
-    c = {"id": cid, "source_id": src["id"], "file": f"media/clips/{Path(file).name}", "thumb": thumb(file, (a + b) / 2, cid),
-         "src_start": round(src_start, 2), "in": round(a, 2), "out": round(b, 2), "file_dur": round(d, 2),
-         "w": p["w"], "h": p["h"], "fps": p["fps"], "why": why, "score": round(score, 2), "status": "new",
-         "category": None, "rating": None, "flags": {}, "note": "", "by": None, "sorted_at": None, "used_in": None,
-         "added": store.now(), "ai": ai}
+    return (0.0, d) if b - a < 1 else (a, b)
+
+
+def clip_meta(f, cid, win_in, win_out, put):
+    """Moteur : mesure l'extrait téléchargé, fait sa vignette (milieu de la sélection) et envoie les deux -> mesures pour
+    add_clip (sur le site)."""
+    p = probe(f)
+    if not p["w"] or p["dur"] < 1:  # fichier vide ou sans image : c'est un échec, pas un extrait noir dans le Tri
+        raise RuntimeError("fichier téléchargé vide ou sans image")
+    key = f"media/clips/{Path(f).name}"
+    put(f, key)
+    a, b = _window(p["dur"], win_in, win_out)
+    tk = thumb(f, (a + b) / 2, cid)
+    if tk:
+        put(store.DATA / tk, tk)
+    return {"cid": cid, "file": key, "thumb": tk, "dur": round(p["dur"], 2), "w": p["w"], "h": p["h"], "fps": p["fps"],
+            "bytes": Path(f).stat().st_size}
+
+
+def _n(x, lo, hi):
+    """Nombre envoyé par un moteur (non fiable) : fini et borné, sinon ValueError."""
+    x = float(x)
+    if not (lo <= x <= hi):
+        raise ValueError(f"valeur hors bornes : {x}")
+    return x
+
+
+def add_clip(src_id, m, win_in, win_out, why, score, ai=None):
+    """Site : fiche d'un extrait à partir des mesures du moteur (le fichier est déjà sur le stockage)."""
+    cid = str(m.get("cid") or "")
+    if not re.fullmatch(r"\w{6,20}", cid) or not re.fullmatch(rf"media/clips/{cid}(-\w+)?\.(mp4|mkv|webm|mov)", str(m.get("file"))):
+        raise ValueError("fichier d'extrait invalide")
+    tk = str(m.get("thumb") or "")
+    if tk and tk != f"media/thumbs/{cid}.jpg":
+        raise ValueError("vignette invalide")
+    d = _n(m.get("dur"), 1, 36000)
+    a, b = _window(d, win_in, win_out)
+    c = {"id": cid, "source_id": src_id, "file": m["file"], "thumb": tk, "src_start": round(_n(m.get("s0"), 0, 1e6), 2),
+         "in": round(a, 2), "out": round(b, 2), "file_dur": round(d, 2), "w": int(_n(m.get("w"), 1, 1e5)),
+         "h": int(_n(m.get("h"), 1, 1e5)), "fps": round(_n(m.get("fps") or 30, 1, 300), 3), "why": str(why)[:600],
+         "score": round(float(score), 2), "status": "new", "category": None, "rating": None, "flags": {}, "note": "", "by": None,
+         "sorted_at": None, "used_in": None, "added": store.now(), "ai": ai, "bytes": int(_n(m.get("bytes") or 0, 0, 1e12))}
     with store.tx() as db:
         db["clips"][cid] = c
     return c
@@ -544,121 +574,6 @@ class _Ctx:
 CTX = _Ctx()
 
 
-def collect(job, inp, max_n=10, window="", streamer="", audio=True, streamer_url="", page_url="", title="", mode=None, by=""):
-    """Tâche de collecte lancée depuis le dashboard. Par défaut : toute la vidéo, 10 moments max.
-    mode : "whole" (la vidéo ou le passage va tel quel dans le Tri) | "auto" (meilleurs moments) | None (courte = whole).
-    by : prénom de qui l'a ajoutée. page_url/title : pour Kick, `inp` est le flux HLS de la VOD et page_url la page kick.com."""
-    tools_check()
-    CTX.update(streamer_url=streamer_url, page_url=page_url, title=title, added_by=by)
-    inp = inp.strip().strip('"')
-    p = Path(inp).expanduser()
-    if not re.match(r"https?://", inp):
-        if not p.exists():
-            raise RuntimeError(f"Fichier introuvable : {inp}")
-        return collect_local(job, p, max_n, window, streamer, audio, mode)
-    try:
-        with job.step("Lecture du lien"):
-            m = meta(inp)
-    except Skip:
-        with store.tx() as db:  # retirée de la liste des VODs : on ne la reproposera plus
-            v = db.get("vods", {}).get(CTX.get("page_url") or inp)
-            if v:
-                v["restricted"] = True
-        raise
-    if m.get("_type") in ("playlist", "multi_video"):
-        ents = [e for e in (m.get("entries") or []) if e]
-        job.log(f"Liste de {len(ents)} vidéos : analyse des {min(len(ents), 5)} premières")
-        for e in ents[:5]:
-            u = e.get("webpage_url") or e.get("url")
-            try:
-                collect_url(job, u, meta(u), max_n, window, streamer, audio, mode)
-            except Exception as ex:  # noqa: BLE001
-                job.log("  ignorée :", ex)
-        return None
-    return collect_url(job, inp, m, max_n, window, streamer, audio, mode)
-
-
-def collect_url(job, url, m, max_n, window, streamer, audio, mode=None):
-    dur = float(m.get("duration") or 0)
-    if m.get("is_live") or m.get("live_status") == "is_live":
-        raise RuntimeError("Ce stream est en direct : attends la VOD (rediffusion) pour l'analyser.")
-    if (mode or ("whole" if dur and dur <= CLIP_MAX and not window else "auto")) == "whole":
-        return import_clip(job, url, m, streamer, window)
-    return analyze(job, url, m, max_n, window, streamer, audio)
-
-
-def import_clip(job, url, m, streamer, window="", local=None):
-    """Mode « whole » : la vidéo (ou seulement le passage) va telle quelle dans le Tri, en UN extrait, en tête de pile."""
-    dur = float(m.get("duration") or 0)
-    lo, hi = parse_window(window) or (0.0, dur)
-    hi = min(hi, dur) if dur else hi
-    if hi - lo > WHOLE_MAX:
-        raise RuntimeError("Trop long pour le mettre en entier : indique un passage, ou choisis « Trouver les meilleurs moments ».")
-    if dur and hi <= lo:
-        raise RuntimeError(f"Passage hors de la vidéo (elle dure {fmt(dur)}).")
-    with store.tx() as db:
-        src, _ = get_source(db, local or url, m, streamer, CTX.get("streamer_url", ""))
-        dup = any(a < (hi or 1e9) and b > lo for a, b in taken_for(db, src["url"]))
-    if dup:
-        raise RuntimeError("Déjà ajoutée : ce passage est déjà dans le Tri (ou a été mis à la poubelle).")
-    job.log(f"Ajout tel quel dans le Tri : « {src['title']} »" + (f", de {fmt(lo)} à {fmt(hi)}" if window else ""))
-    cid, s0 = store.uid(), lo
-    with job.step("Téléchargement des extraits en 1080p"):
-        if local and window:
-            f = cut_local(local, cid, lo, hi)
-        elif local:
-            f = store.CLIPS / f"{cid}{Path(local).suffix.lower()}"
-            shutil.copyfile(local, f)
-        elif window and (platform(url) in ("twitch", "kick") or ".m3u8" in url) and "clip" not in url:
-            f, s0 = hls_section(url, cid, lo, hi)  # s0 = début réel (début du 1er morceau de 10 s)
-        else:
-            f = download(url, cid, lo, hi) if window else download(url, cid)
-    by = CTX.get("added_by")
-    add_clip(src, f, s0, lo - s0, hi - s0 if window else None, f"ajouté par {by}" if by else "ajouté à la main", 50)
-    if by:  # source déjà connue (VOD analysée) : la vidéo reste visible dans « Vidéos » comme ajoutée à la main
-        with store.tx() as db:
-            db["sources"][src["id"]].setdefault("added_by", by)
-    return 1
-
-
-def extend_before(cid, extra=EXTRA_BEFORE):
-    """Retélécharge un extrait avec `extra` s de plus au début (même fin) ; ses réglages (début, fin, morceaux) sont décalés
-    d'autant pour rester sur les mêmes images. -> (fiche à jour, secondes ajoutées)."""
-    with store.lock:
-        db = store.load()
-        c = dict(db["clips"][cid])  # KeyError -> 404
-        src = dict(db["sources"].get(c["source_id"]) or {})
-        dl = (db.get("vods", {}).get(src.get("url")) or {}).get("dl_url")  # Kick : le flux vidéo, s'il est encore connu
-    url = dl or src.get("url") or ""
-    s0, s1 = max(0.0, c["src_start"] - extra), c["src_start"] + c["file_dur"]
-    if c["src_start"] - s0 < 1:
-        raise ValueError("L'extrait commence déjà au tout début de la vidéo.")
-    name = f"{cid}-{store.uid()[:4]}"  # nouveau nom : le navigateur ne ressert pas l'ancienne vidéo depuis son cache
-    try:
-        if not re.match(r"https?://", url):
-            f = cut_local(url, name, s0, s1)
-        elif platform(url) in ("twitch", "kick") or ".m3u8" in url:
-            f, s0 = hls_section(url, name, s0, s1)  # s0 = début réel (début du 1er morceau de 10 s)
-        else:
-            f = download(url, name, s0, s1)
-        d = probe(f)["dur"]
-    except Exception as e:  # noqa: BLE001 - VOD supprimée, réseau… : l'extrait garde son fichier actuel
-        raise ValueError(f"Récupération impossible ({str(e)[:150]}) : l'extrait reste tel quel.") from None
-    delta = c["src_start"] - s0
-    with store.tx() as db:
-        c = db["clips"][cid]
-        old = store.DATA / c["file"]
-        sh = lambda x: round(x + delta, 2)  # noqa: E731
-        c.update({"src_start": round(s0, 2), "file": f"media/clips/{Path(f).name}", "file_dur": round(d, 2),
-                  "in": sh(c["in"]), "out": sh(c["out"])})
-        if c.get("segs"):
-            c["segs"] = [[sh(a), sh(b)] for a, b in c["segs"]]
-        c = dict(c)
-    if old != Path(f):
-        old.unlink(missing_ok=True)
-    return c, delta
-
-
 def taken_for(db, url):
     """Passages déjà pris d'une source : extraits existants + poubelle supprimée à l'export. [] si la source est inconnue."""
     src = next((s for s in db["sources"].values() if s["url"] == url), None)
@@ -722,9 +637,11 @@ def detect(job, url, m, max_n, window, taken, audio=True, local=None, ai_on=True
             "auto": slim(auto), "cands": slim(cands) if cands else None, "trans": trans}
 
 
+# ---------------------------------------------------------------- site : Claude choisit, puis les moteurs téléchargent
+
 def finish(job, url, res, max_n, streamer="", local=None, machine=""):
-    """Point d'entrée du hub, à partir du RESULT de detect() : Claude choisit parmi les candidats transcrits (sinon sélection
-    automatique), puis téléchargement des extraits en 1080p. L'appelant remplit CTX (lien de chaîne, page Kick, titre)."""
+    """Site, à partir du RESULT de detect() : Claude choisit parmi les candidats transcrits (sinon sélection automatique).
+    -> plan de la tâche « clips » (passages à télécharger par un moteur), ou None si rien de nouveau. L'appelant remplit CTX."""
     m, lo, hi = res["meta"], res["lo"], res["hi"]
     dur = float(m.get("duration") or 0)
     with store.tx() as db:
@@ -752,71 +669,243 @@ def finish(job, url, res, max_n, streamer="", local=None, machine=""):
             except Exception as e:  # noqa: BLE001
                 job.log("Mode IA en échec, sélection automatique à la place :", e)
     fresh = [g for g in picks if not any(g["t0"] < b and g["t1"] > a for a, b in taken)]
-    if len(fresh) < len(picks):  # finalisation reprise après un arrêt du hub : ces extraits sont déjà dans le Tri
+    if len(fresh) < len(picks):  # finalisation reprise après un arrêt du site : ces extraits sont déjà dans le Tri
         job.log(f"{len(picks) - len(fresh)} moment(s) déjà extrait(s) : ignoré(s)")
-    picks = fresh
-    if not picks:
+    if not fresh:
         job.log("Rien de nouveau à télécharger.")
-        return 0
-    job.log(f"{len(picks)} moments retenus sur {res['signals']} signaux.")
-    errs = []
-
-    def fetch_one(i, g):
+        return None
+    job.log(f"{len(fresh)} moments retenus sur {res['signals']} signaux : téléchargement par un PC.")
+    out = []
+    for g in fresh:
         s0, s1 = max(0.0, g["t0"] - PAD), g["t1"] + PAD
-        if dur:
-            s1 = min(dur, s1)
-        cid = store.uid()
+        out.append({"cid": store.uid(), "s0": round(s0, 2), "s1": round(min(dur, s1) if dur else s1, 2), "t0": g["t0"],
+                    "t1": g["t1"], "why": g["why"], "score": g["score"], "ai": g.get("ai")})
+    return {"src_id": src["id"], "input": local or url, "local": bool(local), "picks": out, "mode": mode,
+            "signals": res["signals"], "window": f"{fmt(lo)}-{fmt(hi)}", "machine": machine,
+            "steps": res.get("steps", []) + job.steps, "total": res.get("total", 0) + job.elapsed()}
+
+
+def add_clips(job, plan, metas, machine="", steps=(), total=0):
+    """Site : extraits téléchargés par un moteur (tâche « clips ») -> fiches dans le Tri, puis la fiche d'analyse de la source.
+    Rejouable (reprise après un arrêt du site) : un extrait déjà enregistré compte comme fait."""
+    picks = {p["cid"]: p for p in plan["picks"]}
+    ok, errs = 0, []
+    for m in metas if isinstance(metas, list) else []:
+        p = picks.get(m.get("cid")) if isinstance(m, dict) else None
+        if not p:
+            continue
+        if m["cid"] in store.load()["clips"]:
+            ok += 1
+            continue
+        if m.get("error"):
+            errs.append(str(m["error"])[:300])
+            job.log(f"  ✗ {fmt(p['t0'])} échec :", errs[-1])
+            continue
         try:
-            if local:
-                f = cut_local(local, cid, s0, s1)
-            elif platform(url) in ("twitch", "kick") or ".m3u8" in url:
-                f, s0 = hls_section(url, cid, s0, s1)  # s0 = début réel (début du 1er morceau)
-            else:
-                f = download(url, cid, s0, s1)
-            add_clip(src, f, s0, g["t0"] - s0, g["t1"] - s0, g["why"], g["score"], g.get("ai"))
-            job.log(f"  ✓ {i}/{len(picks)}  {fmt(g['t0'])}  [{g['score']}]  {g['why']}")
-            return 1
-        except Exception as e:  # noqa: BLE001
-            job.log(f"  ✗ {i}/{len(picks)}  {fmt(g['t0'])} échec :", e)
-            errs.append(str(e))
-            return 0
-    from concurrent.futures import ThreadPoolExecutor
-    with job.step("Téléchargement des extraits en 1080p"), ThreadPoolExecutor(6) as ex:  # 6 extraits à la fois
-        ok = sum(ex.map(lambda ig: fetch_one(*ig), enumerate(picks, 1)))
-    if not ok:  # avant : comptée « analysée » avec 0 extrait et jamais refaite
-        raise RuntimeError(f"Aucun des {len(picks)} extraits n'a pu être téléchargé : {errs[-1][:300]}")
+            s0 = _n(m.get("s0"), 0, 1e6)
+            add_clip(plan["src_id"], m, p["t0"] - s0, p["t1"] - s0, p["why"], p["score"], p.get("ai"))
+            ok += 1
+            job.log(f"  ✓ {fmt(p['t0'])}  [{p['score']}]  {p['why']}")
+        except (ValueError, TypeError, KeyError) as e:
+            errs.append(f"résultat du moteur illisible ({e})")
+    if not ok:
+        raise RuntimeError(f"Aucun des {len(picks)} extraits n'a pu être téléchargé : {(errs or ['?'])[-1][:300]}")
     job.log(f"{ok} extraits ajoutés à la pile de tri" + (f", {len(errs)} en échec." if errs else "."))
-    with store.tx() as db:  # étapes du moteur (res["steps"]) puis celles du hub ; en local, tout est déjà dans job.steps
-        db["sources"][src["id"]].setdefault("analyses", []).append(
-            {"date": store.now(), "mode": mode, "signals": res["signals"], "clips": ok, "failed": len(errs),
-             "window": f"{fmt(lo)}-{fmt(hi)}", "machine": machine, "steps": res.get("steps", []) + job.steps,
-             "total": res.get("total", 0) + job.elapsed()})
+    with store.tx() as db:  # étapes de l'analyse (moteur + Claude) puis du téléchargement (moteur)
+        s = db["sources"].get(plan["src_id"])
+        if s is not None:
+            s.setdefault("analyses", []).append(
+                {"date": store.now(), "mode": plan["mode"], "signals": plan["signals"], "clips": ok, "failed": len(errs),
+                 "window": plan["window"], "machine": plan.get("machine") or machine,
+                 "steps": list(plan.get("steps") or []) + list(steps), "total": (plan.get("total") or 0) + (total or 0)})
     return ok
 
 
-def analyze(job, url, m, max_n, window, streamer, audio, local=None):
-    """Analyse dans ce processus (lien collé, fichier envoyé) : detect puis finish."""
+def added(job, d, out, steps=(), total=0, machine=""):
+    """Site : fin d'une tâche « add » (vidéo ajoutée à la main). -> {"clips": plan} si l'analyse est à finir par un moteur,
+    {"expand": [liens]} pour une liste de lecture, None si l'extrait est déjà dans le Tri."""
+    CTX.update(streamer_url=d.get("streamer_url", ""), page_url="", title="", added_by=d.get("by", ""))
+    src_url = d.get("key") or d.get("input")
+    if "expand" in out:
+        return {"expand": [u for u in out["expand"] if isinstance(u, str) and re.match(r"https?://", u)][:5]}
+    if "result" in out:
+        res = dict(engines_clean(out["result"]), steps=list(steps), total=total)
+        return {"clips": finish(job, d.get("input"), res, int(d.get("max_n") or 10), d.get("streamer", ""), d.get("key"), machine)}
+    m, lo, hi, clip = out["meta"], _n(out["lo"], 0, 1e6), _n(out["hi"], 0, 1e6), out["clip"]
+    if clip.get("cid") != d.get("cid"):
+        raise ValueError("extrait inattendu")
+    if clip["cid"] in store.load()["clips"]:  # reprise après un arrêt du site
+        return None
+    with store.tx() as db:
+        src, _ = get_source(db, src_url, m, d.get("streamer", ""), d.get("streamer_url", ""))
+        dup = any(a < (hi or 1e9) and b > lo for a, b in taken_for(db, src["url"]))
+    if dup:
+        import s3
+        for k in (clip.get("file"), clip.get("thumb")):
+            if k and str(k).startswith(f"media/") and clip["cid"] in str(k):
+                s3.delete(k)
+        raise RuntimeError("Déjà ajoutée : ce passage est déjà dans le Tri (ou a été mis à la poubelle).")
+    by, s0 = d.get("by"), _n(clip.get("s0"), 0, 1e6)
+    add_clip(src["id"], clip, lo - s0, hi - s0 if out.get("window") else None, f"ajouté par {by}" if by else "ajouté à la main", 50)
+    job.log(f"Ajouté tel quel dans le Tri : « {src['title']} »")
+    if by:  # source déjà connue (VOD analysée) : la vidéo reste visible dans « Vidéos » comme ajoutée à la main
+        with store.tx() as db:
+            db["sources"][src["id"]].setdefault("added_by", by)
+    return None
+
+
+def engines_clean(r):
+    """RESULT d'analyse envoyé par un moteur (non fiable) : même nettoyage que pour une VOD."""
+    import engines
+    return engines._clean(r)
+
+
+def extend_request(cid, extra=EXTRA_BEFORE):
+    """Site, bouton « Récupérer 30 s avant » : données de la tâche « extend » (l'extrait avec `extra` s de plus au début)."""
     with store.lock:
-        taken = taken_for(store.load(), CTX.get("page_url") or local or url)
-    try:
-        res = detect(job, url, m, max_n, window, taken, audio, local, store.config().get("ai", True))
-    except Skip as e:
-        if e.code == "vertical":
-            with store.tx() as db:  # retirée de la liste des VODs : on ne la reproposera plus
-                v = db.get("vods", {}).get(CTX.get("page_url") or url)
-                if v:
-                    v["excluded"] = "verticale"
-        raise
-    return finish(job, url, res, max_n, streamer, local)
+        db = store.load()
+        c = dict(db["clips"][cid])  # KeyError -> 404
+        src = dict(db["sources"].get(c["source_id"]) or {})
+        dl = (db.get("vods", {}).get(src.get("url")) or {}).get("dl_url")  # Kick : le flux vidéo, s'il est encore connu
+    url = dl or src.get("url") or ""
+    s0, s1 = max(0.0, c["src_start"] - extra), c["src_start"] + c["file_dur"]
+    if c["src_start"] - s0 < 1:
+        raise ValueError("L'extrait commence déjà au tout début de la vidéo.")
+    local = not re.match(r"https?://", url)
+    if local:  # fichier envoyé : sur le stockage (inbox/), même pour les anciens chemins du disque
+        url = url if url.startswith("inbox/") else "inbox/" + Path(url).name
+    # nouveau nom : le navigateur ne ressert pas l'ancienne vidéo depuis son cache
+    return {"cid": cid, "input": url, "local": local, "s0": round(s0, 2), "s1": round(s1, 2), "name": f"{cid}-{store.uid()[:4]}",
+            "streamer": src.get("streamer", "")}
 
 
-def collect_local(job, p, max_n, window, streamer, audio, mode=None):
-    p = p.resolve()
-    pr = probe(p)
-    m = {"title": p.stem, "duration": pr["dur"], "channel": streamer or "Inconnu"}
-    if (mode or ("whole" if pr["dur"] <= CLIP_MAX and not window else "auto")) == "whole":
-        return import_clip(job, None, m, streamer, window, str(p))
-    return analyze(job, None, m, max_n, window, streamer, audio, local=str(p))
+def extended(d, out):
+    """Site : fin d'une tâche « extend » -> réglages décalés pour rester sur les mêmes images, ancien fichier supprimé.
+    -> {"clip", "delta"}."""
+    import s3
+    f = str(out.get("file") or "")
+    if not re.fullmatch(rf"media/clips/{re.escape(d['name'])}\.(mp4|mkv|webm|mov)", f):
+        raise ValueError("fichier inattendu")
+    s0, dur = _n(out.get("s0"), 0, 1e6), _n(out.get("dur"), 1, 36000)
+    with store.tx() as db:
+        c = db["clips"][d["cid"]]
+        if c["file"] == f:  # reprise après un arrêt du site : déjà fait
+            return {"clip": dict(c), "delta": 0}
+        old, delta = c["file"], c["src_start"] - s0
+        sh = lambda x: round(x + delta, 2)  # noqa: E731
+        c.update({"src_start": round(s0, 2), "file": f, "file_dur": round(dur, 2), "in": sh(c["in"]), "out": sh(c["out"]),
+                  "bytes": int(_n(out.get("bytes") or 0, 0, 1e12))})
+        if c.get("segs"):
+            c["segs"] = [[sh(a), sh(b)] for a, b in c["segs"]]
+        c = dict(c)
+    s3.delete(old)
+    return {"clip": c, "delta": round(delta, 2)}
+
+
+# ---------------------------------------------------------------- moteur : tout ce qui touche aux vidéos
+
+def _fetch_input(job, url, get):
+    """Fichier envoyé (inbox/…) téléchargé depuis le stockage dans le dossier de la tâche -> chemin local."""
+    p = store.TMP / Path(url).name
+    if not p.exists():
+        with job.step("Téléchargement du fichier envoyé"):
+            get(url, p)
+    return str(p)
+
+
+def _section(url, cid, s0, s1, local=None):
+    """Passage [s0, s1] d'une vidéo -> (fichier, seconde où il commence vraiment)."""
+    if local:
+        return cut_local(local, cid, s0, s1), s0
+    if platform(url) in ("twitch", "kick") or ".m3u8" in url:
+        return hls_section(url, cid, s0, s1)  # s0 = début réel (début du 1er morceau de 10 s)
+    return download(url, cid, s0, s1), s0
+
+
+def fetch_clips(job, plan, get, put):
+    """Moteur, tâche « clips » : télécharge chaque passage retenu (1080p), le mesure, fait sa vignette, envoie les deux."""
+    url = plan["input"]
+    local = _fetch_input(job, url, get) if plan.get("local") else None
+    n = len(plan["picks"])
+
+    def one(i, p):
+        try:
+            f, s0 = _section(url, p["cid"], p["s0"], p["s1"], local)
+            m = clip_meta(f, p["cid"], p["t0"] - s0, p["t1"] - s0, put)
+            job.log(f"  ✓ {i}/{n}  {fmt(p['t0'])}")
+            return dict(m, s0=round(s0, 2))
+        except Exception as e:  # noqa: BLE001 - un extrait raté n'empêche pas les autres
+            job.log(f"  ✗ {i}/{n}  {fmt(p['t0'])} échec :", e)
+            return {"cid": p["cid"], "error": str(e)[:300]}
+    from concurrent.futures import ThreadPoolExecutor
+    with job.step("Téléchargement des extraits en 1080p"), ThreadPoolExecutor(6) as ex:  # 6 extraits à la fois
+        out = list(ex.map(lambda ip: one(*ip), enumerate(plan["picks"], 1)))
+    if all("error" in m for m in out):
+        raise RuntimeError(f"Aucun des {n} extraits n'a pu être téléchargé : {out[-1]['error'] if out else '?'}")
+    return {"clips": out}
+
+
+def add_video(job, d, get, put):
+    """Moteur, tâche « add » (vidéo ajoutée à la main, lien ou fichier envoyé) : mode "whole" -> le passage va tel quel dans le
+    Tri ; "auto" -> détection (chat, audio, Whisper), Claude choisira sur le site ; None -> courte = whole. Liste de lecture :
+    ses 5 premières vidéos deviennent 5 tâches."""
+    url, local = d.get("input"), None
+    if d.get("key"):
+        local = _fetch_input(job, d["key"], get)
+        pr = probe(local)
+        if not pr["dur"]:
+            raise RuntimeError("Fichier vidéo illisible.")
+        m = {"title": Path(d.get("name") or local).stem, "duration": pr["dur"], "channel": d.get("streamer") or "Inconnu",
+             "width": pr["w"], "height": pr["h"]}
+    else:
+        with job.step("Lecture du lien"):
+            m = meta(url)
+        if m.get("_type") in ("playlist", "multi_video"):
+            ents = [e for e in (m.get("entries") or []) if e]
+            job.log(f"Liste de {len(ents)} vidéos : les {min(len(ents), 5)} premières")
+            return {"expand": [u for u in (e.get("webpage_url") or e.get("url") for e in ents[:5]) if u]}
+        if m.get("is_live") or m.get("live_status") == "is_live":
+            raise RuntimeError("Ce stream est en direct : attends la VOD (rediffusion) pour l'analyser.")
+    dur, window = float(m.get("duration") or 0), d.get("window") or ""
+    taken = [tuple(w) for w in d.get("taken") or []]
+    if (d.get("mode") or ("whole" if dur and dur <= CLIP_MAX and not window else "auto")) != "whole":
+        return {"result": detect(job, url, m, int(d.get("max_n") or 10), window, taken, True, local, bool(d.get("ai", True)))}
+    lo, hi = parse_window(window) or (0.0, dur)
+    hi = min(hi, dur) if dur else hi
+    if hi - lo > WHOLE_MAX:
+        raise RuntimeError("Trop long pour le mettre en entier : indique un passage, ou choisis « Trouver les meilleurs moments ».")
+    if dur and hi <= lo:
+        raise RuntimeError(f"Passage hors de la vidéo (elle dure {fmt(dur)}).")
+    if any(a < (hi or 1e9) and b > lo for a, b in taken):
+        raise RuntimeError("Déjà ajoutée : ce passage est déjà dans le Tri (ou a été mis à la poubelle).")
+    job.log(f"Ajout tel quel dans le Tri : « {m.get('title') or url} »" + (f", de {fmt(lo)} à {fmt(hi)}" if window else ""))
+    cid, s0 = d["cid"], lo
+    with job.step("Téléchargement des extraits en 1080p"):
+        if local and window:
+            f = cut_local(local, cid, lo, hi)
+        elif local:
+            f = store.CLIPS / f"{cid}{Path(local).suffix.lower()}"
+            shutil.copyfile(local, f)
+        elif window and (platform(url) in ("twitch", "kick") or ".m3u8" in url) and "clip" not in url:
+            f, s0 = hls_section(url, cid, lo, hi)
+        else:
+            f = download(url, cid, lo, hi) if window else download(url, cid)
+        clip = clip_meta(f, cid, lo - s0, (hi - s0) if window else None, put)
+    return {"clip": dict(clip, s0=round(s0, 2)), "meta": {k: m[k] for k in META if m.get(k) is not None}, "lo": lo, "hi": hi,
+            "window": bool(window)}
+
+
+def extend_clip(job, d, get, put):
+    """Moteur, tâche « extend » : l'extrait retéléchargé avec des secondes de plus au début (même fin)."""
+    local = _fetch_input(job, d["input"], get) if d.get("local") else None
+    with job.step("Téléchargement des extraits en 1080p"):
+        f, s0 = _section(d["input"], d["name"], d["s0"], d["s1"], local)
+    p = probe(f)
+    if not p["w"] or p["dur"] < 1:
+        raise RuntimeError("fichier téléchargé vide ou sans image")
+    key = f"media/clips/{Path(f).name}"
+    put(f, key)
+    return {"file": key, "s0": round(s0, 2), "dur": round(p["dur"], 2), "bytes": Path(f).stat().st_size}
 
 
 def safe_name(name):

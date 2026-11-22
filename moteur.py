@@ -1,5 +1,7 @@
-"""Moteur : tourne sur chaque machine (PC des amis, Mac, PC du hub). Demande des VODs au site (le hub), fait la partie lourde
-(chat, audio, Whisper) dans un processus enfant par VOD, et renvoie candidats + transcriptions. Claude et les extraits : sur le hub.
+"""Moteur : tourne sur chaque PC (amis, ce PC). Fait TOUT le travail sur les vidéos, dans un processus enfant par élément :
+analyse des VODs (chat, audio, Whisper -> candidats + transcriptions, Claude choisit sur le site), puis les tâches du site :
+téléchargement des extraits retenus, vidéos ajoutées à la main, « 30 s avant », exports. Les fichiers passent par le stockage
+(S3) avec des liens signés demandés au site : le moteur n'a jamais les clés.
   python moteur.py --conf moteur.json                 (amis ; moteur.json = {"hub", "token", "name"})
   python moteur.py --hub URL --token JETON [--slots N]  (moteur local lancé par le hub)
   python moteur.py --run <job.json>                   (processus enfant : UNE VOD ; interne)"""
@@ -9,6 +11,7 @@ import http.client
 import json
 import os
 import platform
+import re
 import shutil
 import signal
 import socket
@@ -27,12 +30,15 @@ os.environ.setdefault("PYTHONUTF8", "1")
 
 import collect  # noqa: E402
 import jobs  # noqa: E402
+import s3  # noqa: E402
 import store  # noqa: E402
 
-PROTOCOL = 1
+PROTOCOL = 2
+SLOT_KINDS = ("vod", "add")  # occupent une place (analyse, Whisper) ; extraits, « 30 s avant » et exports passent en plus
+KIND_FR = {"clips": "Téléchargement des extraits", "add": "Vidéo ajoutée", "extend": "30 s avant", "export": "Export"}
 JOBDIR = store.DATA / "jobs"
 NETERR = (OSError, ValueError, http.client.HTTPException)  # serveur injoignable / réponse illisible : on réessaie
-HUB = TOKEN = ""
+HUB = TOKEN = LEASE = ""
 RUN = {}  # bail -> {url, title, streamer, step, line, started, proc, killed, tail}
 LK = threading.Lock()
 
@@ -40,7 +46,7 @@ LK = threading.Lock()
 def code_version():
     """Empreinte du code d'analyse (même fonction que engines.code_version) : le site signale un moteur pas à jour."""
     h = hashlib.sha1()
-    for f in ("collect.py", "ai.py", "moteur.py", "engines.py"):
+    for f in ("collect.py", "ai.py", "moteur.py", "engines.py", "montage.py", "store.py"):
         p = ROOT / f
         h.update(p.read_bytes() if p.exists() else b"")
     return h.hexdigest()[:8]
@@ -88,23 +94,27 @@ def clean_tmp():
 
 
 def start(g):
-    path = JOBDIR / f"{g['lease']}.json"
+    path, env = JOBDIR / f"{g['lease']}.json", None
+    if g.get("task"):  # tâche : dossier de travail jetable, liens signés demandés au site avec la clé de cette machine
+        g = dict(g, hub=HUB, token=TOKEN)
+        env = dict(os.environ, BESTOF_DATA=str(JOBDIR / g["lease"]))
     path.write_text(json.dumps(g, ensure_ascii=False), "utf-8")
     p = subprocess.Popen([sys.executable, __file__, "--run", str(path)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                         text=True, encoding="utf-8", errors="replace", start_new_session=os.name != "nt",
+                         text=True, encoding="utf-8", errors="replace", start_new_session=os.name != "nt", env=env,
                          creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
     r = {"url": g["url"], "title": g.get("title") or g["url"], "streamer": g.get("streamer", ""), "step": "Démarrage",
-         "line": "", "started": int(time.time()), "proc": p, "killed": False, "tail": []}
+         "line": "", "started": int(time.time()), "proc": p, "killed": False, "tail": [], "task": g.get("task"),
+         "kind": g.get("kind") or "vod"}
     RUN[g["lease"]] = r
-    print(f"▶ Analyse de « {r['title']} »" + (f" ({r['streamer']})" if r["streamer"] else ""), flush=True)
+    what = KIND_FR.get(r["kind"], "Analyse")
+    print(f"▶ {what} : « {r['title']} »" + (f" ({r['streamer']})" if r["streamer"] else ""), flush=True)
     threading.Thread(target=follow, args=(g["lease"], r, path), daemon=True).start()
 
 
 def follow(lease, r, path):
     """Suit l'enfant (étape, dernière ligne), puis envoie son résultat au site (réessaie jusqu'à ~2 h si le PC est éteint)."""
     for s in r["proc"].stdout:
-        s = s.rstrip()
-        s = s[10:] if s.startswith("[collect] ") else s
+        s = re.sub(r"^\[\w+\] ", "", s.rstrip())  # « [collect] … », « [export] … » : préfixe du journal de l'enfant
         if not s:
             continue
         r["tail"] = r["tail"][-39:] + [s]
@@ -127,7 +137,8 @@ def follow(lease, r, path):
         r["step"], t0, delay = "Envoi du résultat", time.time(), 5
         while not r["killed"]:
             try:
-                ans = post("/api/engine/result", {"lease": lease, "url": r["url"], **out}, timeout=120)
+                ans = post("/api/engine/done" if r["task"] else "/api/engine/result",
+                           {"lease": lease, "url": r["url"], "task": r["task"], **out}, timeout=120)
                 if not ans.get("ok"):
                     print("   résultat refusé par le site :", ans.get("error"), flush=True)
                 break
@@ -141,6 +152,7 @@ def follow(lease, r, path):
         RUN.pop(lease, None)
         path.unlink(missing_ok=True)
         out_p.unlink(missing_ok=True)
+        shutil.rmtree(JOBDIR / lease, ignore_errors=True)  # dossier de travail d'une tâche (extraits, export)
         if not RUN:
             clean_tmp()
 
@@ -185,9 +197,10 @@ def engine(hub, token, slots):
     try:
         while os.getppid() == ppid:  # parent disparu (hub tué) : on s'arrête, le hub relancera un moteur
             with LK:
-                mine = [{"lease": k, **{f: r[f] for f in ("url", "step", "line", "started")}} for k, r in RUN.items()]
+                mine = [{"lease": k, "task": r["task"], **{f: r[f] for f in ("url", "step", "line", "started")}} for k, r in RUN.items()]
+                used = sum(1 for r in RUN.values() if r["kind"] in SLOT_KINDS)
             try:
-                ans = post("/api/engine/beat", {**info, "want": 0 if paused else max(0, slots - len(mine)), "jobs": mine})
+                ans = post("/api/engine/beat", {**info, "want": 0 if paused else max(0, slots - used), "jobs": mine})
             except NETERR:
                 if not offline:
                     print("Serveur injoignable (ton PC est peut-être éteint), nouvel essai…", flush=True)
@@ -231,17 +244,75 @@ def engine(hub, token, slots):
         print("Moteur arrêté.", flush=True)
 
 
+# ---------------------------------------------------------------- fichiers : liens signés par le site (processus enfant)
+
+def _signed(kind, key):
+    """Lien (24 h) pour lire (kind="get") ou écrire ("put") `key` sur le stockage. Le site peut redémarrer : on réessaie."""
+    delay = 5
+    for _ in range(9):
+        try:
+            r = post("/api/engine/sign", {"lease": LEASE, kind: [key]}, timeout=30)
+            if r.get("ok"):
+                u = r[kind][key]
+                return HUB + u if u.startswith("/") else u  # stockage local du site : lien relatif
+            if "refusé" in str(r.get("error")):
+                raise RuntimeError(r["error"])
+        except NETERR:
+            pass
+        time.sleep(delay)
+        delay = min(delay * 2, 60)
+    raise RuntimeError(f"le site ne donne pas de lien pour {key} (site éteint ?)")
+
+
+def get(key, dst):
+    dst = Path(dst)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    for k in range(4):
+        try:
+            with urllib.request.urlopen(_signed("get", key), timeout=120) as r, open(dst, "wb") as f:
+                shutil.copyfileobj(r, f, 1 << 20)
+            return dst
+        except NETERR:
+            if k == 3:
+                raise
+            time.sleep(5 * (k + 1))
+
+
+def put(src, key):
+    src = Path(src)
+    for k in range(6):  # envoi de plusieurs Go : le site ou le réseau peuvent couper, on recommence
+        try:
+            with open(src, "rb") as f:
+                req = urllib.request.Request(_signed("put", key), data=f, method="PUT",
+                                             headers={"Content-Length": str(src.stat().st_size), "Content-Type": s3.ctype(key)})
+                urllib.request.urlopen(req, timeout=600).read()
+            return
+        except NETERR:
+            if k == 5:
+                raise
+            time.sleep(10 * (k + 1))
+
+
 def child(path):
-    """Une VOD : détection complète -> <job>.out.json. Code de sortie 0 dans tous les cas prévus."""
-    import ai
+    """Une VOD (détection complète) ou une tâche du site -> <job>.out.json. Code de sortie 0 dans tous les cas prévus."""
+    global HUB, TOKEN, LEASE
     g = json.loads(Path(path).read_text("utf-8"))
+    kind = g.get("kind") or "vod"
     collect.CTX.update(title=g.get("title", ""))
-    j = jobs.Job("collect", g.get("title") or g["url"], None, ())
+    j = jobs.Job("collect" if kind == "vod" else kind, g.get("title") or g["url"], None, ())
     j.t0 = time.time()
     try:
-        res = collect.detect_vod(j, g["input"], int(g.get("max_n") or 10), [tuple(w) for w in g.get("taken") or []],
-                                 bool(g.get("ai")) and ai.whisper_ok())
-        out = {"ok": True, "result": res, "steps": j.steps, "total": j.elapsed()}
+        if kind == "vod":
+            import ai
+            res = collect.detect_vod(j, g["input"], int(g.get("max_n") or 10), [tuple(w) for w in g.get("taken") or []],
+                                     bool(g.get("ai")) and ai.whisper_ok())
+            out = {"ok": True, "result": res, "steps": j.steps, "total": j.elapsed()}
+        else:
+            import montage
+            HUB, TOKEN, LEASE = g["hub"].rstrip("/"), g["token"], g["lease"]
+            fn = {"clips": collect.fetch_clips, "add": collect.add_video, "extend": collect.extend_clip,
+                  "export": montage.render_task}[kind]
+            out = {"ok": True, "out": fn(j, g["data"], get, put), "steps": j.steps, "total": j.elapsed()}
     except collect.Skip as e:
         j.log("Écartée :", e)
         out = {"ok": False, "code": e.code, "error": str(e)}
